@@ -6,7 +6,7 @@ import platform
 init(autoreset=True)
 def cmd(*args, **kwargs) -> bool:
     command_str = args[0] if isinstance(args[0], str) else ' '.join(args[0])
-    print(Fore.CYAN + f"COMMAND  " + Fore.WHITE + f"{command_str}\n")
+    print(Fore.CYAN + f"COMMAND  " + Fore.WHITE + f"{command_str}")
     try:
         result = subprocess.run(*args, **kwargs)
         if result.stdout:
@@ -36,18 +36,18 @@ if platform.system() == "Windows":
             "cpp_compiler": "g++"   # C++ compiler
         },
         "cflags": {
-            "common": "-Wall",   # Common flags for both C and C++ files
-            "c": "",                         # Additional flags specific to C
-            "cpp": ""                        # Additional flags specific to C++
+            "common": "-Wall",        # Common flags for both C and C++ files
+            "c": "",                  # Additional flags specific to C
+            "cpp": "-std=c++11 "      # Additional flags specific to C++
         },
         "ldflags": "",                # Linking flags (for libraries)
         "output": {
-            "object_dir": ".\\obj",           # Directory for object files
-            "binary_dir": ".\\bin",           # Directory for the output executable
-            "binary_name": "main" # Name of the output binary
+            "object_dir": ".\\obj",   # Directory for object files
+            "binary_dir": ".\\bin",   # Directory for the output executable
+            "binary_name": "main"     # Name of the output binary
         },
-        "src_dirs": [".\\src"],  # Allow multiple source directories
-        "src_files": []  # Allow individual source files
+        "src_dirs": [".\\src"],       # Allow multiple source directories
+        "src_files": []               # Allow individual source files
     }
 
 def compile(config):
@@ -233,14 +233,12 @@ def opengl() -> bool:
     if platform.system() == "Darwin":
         pass
 
-#https://github.com/GraphicsProgramming/dear-imgui-styles?tab=readme-ov-file#adobeimgui-spectrum
+# https://github.com/adobe/imgui.git
 def imgui() -> bool:
     if platform.system() == "Windows":
         if not os.path.exists(".\\external\\imgui"):
             cmd("git clone https://github.com/adobe/imgui.git .\\external\\imgui", shell=True)
-
-        config["cflags"]["cpp"] += "-std=c++11 "
-        config["cflags"]["common"] += "-I external/imgui -I external/imgui/backends "
+        config["cflags"]["common"] += "-I external\\imgui -I external\\imgui\\backends "
         config["src_dirs"].append(".\\external\\imgui")
         config["src_files"].append(".\\external\\imgui\\backends\\imgui_impl_glfw.cpp")
         config["src_files"].append(".\\external\\imgui\\backends\\imgui_impl_opengl3.cpp")
@@ -249,12 +247,24 @@ def imgui() -> bool:
     if platform.system() == "Darwin":
         pass
 
+# https://github.com/epezent/implot.git
+def implot() -> bool:
+    if platform.system() == "Windows":
+        if not os.path.exists(".\\external\\implot"):
+            cmd("git clone https://github.com/epezent/implot.git .\\external\\implot", shell=True)
+        config["cflags"]["common"] += "-I external\\implot -I external\\implot\\backends "
+        config["src_dirs"].append(".\\external\\implot")
+    if platform.system() == "Linux":
+        pass
+    if platform.system() == "Darwin":
+        pass
 
 
 if __name__ == "__main__":
     tcc()
     opengl()
     imgui()
+    implot()
     compile(config)
 
     
