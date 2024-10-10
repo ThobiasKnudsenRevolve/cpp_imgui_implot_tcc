@@ -163,10 +163,10 @@ def tcc() -> bool:
                     return False
                 
             if not cmd("make --version", shell=True) \
-            or not cmd("gcc --version", shell=True):
-                cmd("powershell -Command \"Set-ExecutionPolicy RemoteSigned -Scope CurrentUser\"", shell=True)
-                cmd("powershell -Command \"Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')\"", shell=True)
-                cmd("powershell -Command \"scoop install gcc make\"", shell=True)
+            or not cmd("g++ --version", shell=True):
+                if not cmd("choco --version", shell=True):
+                    cmd("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"", shell=True)
+                cmd("powershell -Command \"choco install make mingw -y\"", shell=True)
 
             cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\tcc\"", shell=True)
             bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
