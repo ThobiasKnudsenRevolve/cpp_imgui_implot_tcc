@@ -26,6 +26,10 @@ def cmd(*args, **kwargs) -> bool:
         print(Fore.RED + "ERROR: CalledProcessError occurred   " + Fore.WHITE + f"Details: {e}\n")
         return False
 
+
+cwd_win = os.getcwd()
+cwd_unix = cwd_win.replace("\\", "/")
+
 # Updated configuration to allow multiple source directories
 config = {}
 if platform.system() == "Windows":
@@ -149,48 +153,45 @@ def compile(config):
 
 def tcc() -> bool:
     if platform.system() == "Windows":
-        if not os.path.exists(".\\include") \
-        or not os.path.exists(".\\lib") \
-        or not os.path.exists(".\\libtcc") \
-        or not os.path.exists(".\\libtcc.dll"):
+        if not os.path.exists(f"{cwd_win}\\include") \
+        or not os.path.exists(f"{cwd_win}\\lib") \
+        or not os.path.exists(f"{cwd_win}\\libtcc") \
+        or not os.path.exists(f"{cwd_win}\\libtcc.dll"):
             
-            if not cmd("git --version", shell=True):
-                if not cmd("winget --version", shell=True):
+            if not cmd("git --version", cwd=cwd_win, shell=True):
+                if not cmd("winget --version", cwd=cwd_win, shell=True):
                     print(Fore.RED + "You need to manually install winget or Git.")
                     return False
-                if not cmd("winget install --id Git.Git -e --source winget", shell=True):
+                if not cmd("winget install --id Git.Git -e --source winget", cwd=cwd_win, shell=True):
                     print(Fore.RED + "Could not install Git via winget.")
                     return False
-                
-            if not cmd("make --version", shell=True) \
-            or not cmd("g++ --version", shell=True):
-                if not cmd("choco --version", shell=True):
-                    cmd("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"", shell=True)
-                cmd("powershell -Command \"choco install make mingw -y\"", shell=True)
+            if not cmd("make --version", cwd=cwd_win, shell=True) \
+            or not cmd("g++ --version", cwd=cwd_win, shell=True):
+                if not cmd("choco --version", cwd=cwd_win, shell=True):
+                    cmd("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"", cwd=cwd_win, shell=True)
+                cmd("powershell -Command \"choco install make mingw -y\"", cwd=cwd_win, shell=True)
 
-            cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\tcc\"", shell=True)
+            cmd(f"powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\tcc\"", cwd=cwd_win, shell=True)
             bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
-            os.makedirs(".\\external\\installs\\tcc")
-            cmd(f"git clone https://github.com/Tiny-C-Compiler/mirror-repository .\\external\\installs\\tcc", capture_output=True, text=True)
-            os.makedirs(".\\external\\installs\\tcc\\build")
+            os.makedirs(f"{cwd_win}\\external\\installs\\tcc")
+            cmd(f"git clone https://github.com/Tiny-C-Compiler/mirror-repository .\\external\\installs\\tcc", cwd=cwd_win, capture_output=True, text=True)
+            os.makedirs(f"{cwd_win}\\external\\installs\\tcc\\build")
             configure_prefix = (os.path.abspath(os.path.join("external", "installs", "tcc", "build"))).replace("\\", "/")
-            cmd([bash_path, '-c', f"cd ./external/installs/tcc && ./configure --prefix={configure_prefix}"], capture_output=True, text=True)
-            cmd([bash_path, '-c', f"cd ./external/installs/tcc && make"], capture_output=True, text=True)
-            cmd([bash_path, '-c', f"cd ./external/installs/tcc && make install"], capture_output=True, text=True)
-            cmd([bash_path, '-c', f"cp -ru ./external/installs/tcc/build/libtcc.dll libtcc.dll"], capture_output=True, text=True)
-            cmd([bash_path, '-c', f"cp -ru ./external/installs/tcc/build/libtcc ."], capture_output=True, text=True)
-            cmd([bash_path, '-c', f"cp -ru ./external/installs/tcc/build/include ."], capture_output=True, text=True)
-            cmd([bash_path, '-c', f"cp -ru ./external/installs/tcc/build/lib ."], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cd {cwd_unix}/external/installs/tcc && ./configure --prefix={configure_prefix}"], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cd {cwd_unix}/external/installs/tcc && make"], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cd {cwd_unix}/external/installs/tcc && make install"], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cp -ru {cwd_unix}/external/installs/tcc/build/libtcc.dll {cwd_unix}/libtcc.dll"], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cp -ru {cwd_unix}/external/installs/tcc/build/libtcc {cwd_unix}"], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cp -ru {cwd_unix}/external/installs/tcc/build/include {cwd_unix}"], capture_output=True, text=True)
+            cmd([bash_path, '-c', f"cp -ru {cwd_unix}/external/installs/tcc/build/lib {cwd_unix}"], capture_output=True, text=True)
 
-            if not os.path.exists(".\\include") \
-            or not os.path.exists(".\\lib") \
-            or not os.path.exists(".\\libtcc") \
-            or not os.path.exists("libtcc.dll"):
+            if not os.path.exists(f"{cwd_win}\\include") \
+            or not os.path.exists(f"{cwd_win}\\lib") \
+            or not os.path.exists(f"{cwd_win}\\libtcc") \
+            or not os.path.exists(f"{cwd_win}\\libtcc.dll"):
                 print(Fore.RED + "Could not install TinyCC.")
                 return False
-            
             print(Fore.GREEN + "TinyCC built successfully in the local folder.\n")
-
         config["cflags"]["common"] += " -I libtcc "
         config["ldflags"] += " libtcc.dll " 
         return True
@@ -201,27 +202,27 @@ def tcc() -> bool:
 
 def opengl() -> bool:
     if platform.system() == "Windows":
-        if not os.path.exists(".\\external\\glew") \
-        or not os.path.exists(".\\external\\glfw"):
+        if not os.path.exists(f"{cwd_win}\\external\\glew") \
+        or not os.path.exists(f"{cwd_win}\\external\\glfw"):
             
-            if not cmd("git --version", shell=True):
-                if not cmd("winget --version", shell=True):
-                    print(Fore.RED + "You need to manually install winget or Git.")
+            if not cmd("git --version", cwd=cwd_win, shell=True):
+                if not cmd("winget --version", cwd=cwd_win, shell=True):
+                    print(Fore.RED + "You need to manually install winget or Git.", cwd=cwd_win)
                     return False
-                if not cmd("winget install --id Git.Git -e --source winget", shell=True):
+                if not cmd("winget install --id Git.Git -e --source winget", cwd=cwd_win, shell=True):
                     print(Fore.RED + "Could not install Git via winget.")
                     return False
                 
-            cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\glfw.zip\"", shell=True)
-            cmd("curl -L -o .\\external\\installs\\glfw.zip https://sourceforge.net/projects/glfw/files/glfw/3.3.10/glfw-3.3.10.bin.WIN64.zip/download", shell=True)
-            cmd("powershell -Command \"Expand-Archive -Path glfw.zip -DestinationPath ..\\glfw\"", cwd=".\\external\\installs", shell=True)
+            cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\glfw.zip\"", cwd=cwd_win, shell=True)
+            cmd("curl -L -o .\\external\\installs\\glfw.zip https://sourceforge.net/projects/glfw/files/glfw/3.3.10/glfw-3.3.10.bin.WIN64.zip/download", cwd=cwd_win, shell=True)
+            cmd("powershell -Command \"Expand-Archive -Path glfw.zip -DestinationPath ..\\glfw\"", cwd=f"{cwd_win}\\external\\installs", shell=True)
                 
-            cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\glew.zip\"", shell=True)
-            cmd("curl -L -o .\\external\\installs\\glew.zip https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0-win32.zip/download", capture_output=True, text=True)
-            cmd("powershell -Command \"Expand-Archive -Path glew.zip -DestinationPath ..\\glew\"",cwd=".\\external\\installs", capture_output=True, text=True)
+            cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\glew.zip\"", cwd=cwd_win, shell=True)
+            cmd("curl -L -o .\\external\\installs\\glew.zip https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0-win32.zip/download", cwd=cwd_win, capture_output=True, text=True)
+            cmd("powershell -Command \"Expand-Archive -Path glew.zip -DestinationPath ..\\glew\"", cwd=f"{cwd_win}\\external\\installs", capture_output=True, text=True)
 
-            if not os.path.exists(".\\external\\glew") \
-            or not os.path.exists(".\\external\\glfw"):
+            if not os.path.exists(f"{cwd_win}\\external\\glew") \
+            or not os.path.exists(f"{cwd_win}\\external\\glfw"):
                 print(Fore.RED + "Could not build OpenGL")
                 return False
             
@@ -230,8 +231,8 @@ def opengl() -> bool:
         bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
         if not os.path.exists(".\\bin"):
             os.makedirs(".\\bin")
-        cmd([bash_path, '-c', "cp external/glew/glew-2.1.0/bin/Release/x64/glew32.dll ./bin"], capture_output=True, text=True)
-        cmd([bash_path, '-c', "cp external/glfw/glfw-3.3.10.bin.WIN64/lib-mingw-w64/glfw3.dll ./bin"], capture_output=True, text=True)
+        cmd([bash_path, '-c', f"cp {cwd_unix}/external/glew/glew-2.1.0/bin/Release/x64/glew32.dll {cwd_unix}/bin"], capture_output=True, text=True)
+        cmd([bash_path, '-c', f"cp {cwd_unix}/external/glfw/glfw-3.3.10.bin.WIN64/lib-mingw-w64/glfw3.dll {cwd_unix}/bin"], capture_output=True, text=True)
         config["cflags"]["common"] += " -I external\\glfw\\glfw-3.3.10.bin.WIN64\\include -I external\\glew\\glew-2.1.0\\include "
         config["ldflags"] += "-L external\\glfw\\glfw-3.3.10.bin.WIN64\\lib-mingw-w64 -L external\\glew\\glew-2.1.0\\lib\\Release\\x64 -lglew32 -lglfw3 -lopengl32 -lgdi32 " 
         return True
@@ -243,8 +244,9 @@ def opengl() -> bool:
 # https://github.com/adobe/imgui.git
 def imgui() -> bool:
     if platform.system() == "Windows":
-        if not os.path.exists(".\\external\\imgui"):
-            cmd("git clone https://github.com/adobe/imgui.git .\\external\\imgui", shell=True)
+        cwd_win = os.getcwd()
+        if not os.path.exists(f"{cwd_win}\\external\\imgui"):
+            cmd("git clone https://github.com/adobe/imgui.git .\\external\\imgui", cwd = cwd_win, shell=True)
         config["cflags"]["common"] += "-I external\\imgui -I external\\imgui\\backends "
         config["src_dirs"].append(".\\external\\imgui")
         config["src_files"].append(".\\external\\imgui\\backends\\imgui_impl_glfw.cpp")
@@ -257,8 +259,8 @@ def imgui() -> bool:
 # https://github.com/epezent/implot.git
 def implot() -> bool:
     if platform.system() == "Windows":
-        if not os.path.exists(".\\external\\implot"):
-            cmd("git clone https://github.com/epezent/implot.git .\\external\\implot", shell=True)
+        if not os.path.exists(f"{cwd_win}\\external\\implot"):
+            cmd("git clone https://github.com/epezent/implot.git .\\external\\implot", cwd = cwd_win, shell=True)
         config["cflags"]["common"] += "-I external\\implot -I external\\implot\\backends "
         config["src_dirs"].append(".\\external\\implot")
     if platform.system() == "Linux":
