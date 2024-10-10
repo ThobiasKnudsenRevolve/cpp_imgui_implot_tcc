@@ -162,12 +162,19 @@ def tcc() -> bool:
                     print(Fore.RED + "Could not install Git via winget.")
                     return False
                 
+            if not cmd("make --version", shell=True) \
+            or not cmd("gcc --version", shel=True):
+                cmd("powershell -Command \"Set-ExecutionPolicy RemoteSigned -Scope CurrentUser\"", shell=True)
+                cmd("powershell -Command \"Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')\"", shell=True)
+                cmd("powershell -Command \"scoop install gcc make\"", shell=True)
+
             cmd("powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\tcc\"", shell=True)
             bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
             os.makedirs(".\\external\\installs\\tcc")
             cmd(f"git clone https://github.com/Tiny-C-Compiler/mirror-repository .\\external\\installs\\tcc", capture_output=True, text=True)
             os.makedirs(".\\external\\installs\\tcc\\build")
-            cmd([bash_path, '-c', f"cd ./external/installs/tcc && ./configure --prefix={os.path.abspath(".\\external\\installs\\tcc\\build").replace("\\", "/")}"], capture_output=True, text=True)
+            configure_prefix = (os.path.abspath(os.path.join("external", "installs", "tcc", "build"))).replace("\\", "/")
+            cmd([bash_path, '-c', f"cd ./external/installs/tcc && ./configure --prefix={configure_prefix}"], capture_output=True, text=True)
             cmd([bash_path, '-c', f"cd ./external/installs/tcc && make"], capture_output=True, text=True)
             cmd([bash_path, '-c', f"cd ./external/installs/tcc && make install"], capture_output=True, text=True)
             cmd([bash_path, '-c', f"cp -ru ./external/installs/tcc/build/libtcc.dll libtcc.dll"], capture_output=True, text=True)
