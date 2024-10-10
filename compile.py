@@ -164,11 +164,11 @@ def tcc() -> bool:
             or not cmd("gcc --version", cwd=cwd_win, shell=True) \
             or not cmd("git --version", cwd=cwd_win, shell=True):
                 if not cmd("choco --version", cwd=cwd_win, shell=True):
-                    cmd("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"", cwd=cwd_win, shell=True)
+                    cmd("Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))", cwd=cwd_win, shell=True)
                     cmd("refreshenv", shell=True)
                 cmd("choco install make mingw git -y", cwd=cwd_win, shell=True)
-                cmd("powershell -Command \"Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1\"", shell=True)
-                cmd("powershell -Command \"refreshenv\"", shell=True)
+                cmd("Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1", shell=True)
+                cmd("refreshenv", shell=True)
                 if not cmd("make --version", cwd=cwd_win, shell=True) \
                 or not cmd("g++ --version", cwd=cwd_win, shell=True) \
                 or not cmd("gcc --version", cwd=cwd_win, shell=True) \
@@ -178,7 +178,7 @@ def tcc() -> bool:
                     
                 #cmd("setx PATH \"%PATH%;C:\\ProgramData\\mingw64\\install\\mingw64\\bin\" /M", cwd=cwd_win, shell=True)
 
-            cmd(f"powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\tcc\"", cwd=cwd_win, shell=True)
+            cmd(f"Remove-Item -Recurse -Force .\\external\\installs\\tcc", cwd=cwd_win, shell=True)
             bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
             os.makedirs(f"{cwd_win}\\external\\installs\\tcc")
             cmd(f"git clone https://github.com/Tiny-C-Compiler/mirror-repository .\\external\\installs\\tcc", cwd=cwd_win, capture_output=True, text=True)
