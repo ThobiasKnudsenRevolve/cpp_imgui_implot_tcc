@@ -26,3 +26,8 @@ https://sourceforge.net/projects/glfw/files/glfw/3.3.10/glfw-3.3.10.bin.WIN64.zi
 It's for OpenGL which is the backend for ImGUI
 #### Windows
 https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0-win32.zip/download
+
+## How To Install Python
+### Windows
+>curl -o python-installer.exe https://www.python.org/ftp/python/3.12.1/python-3.12.1-amd64.exe
+>python-installer.exe /quiet InstallAllUsers=1 PrependPath=1
