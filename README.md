@@ -4,7 +4,7 @@ testing c++ imgui implot tcc stack for A7 whilst also being really easy to insta
 ## Installation
 ### Windows/MacoOS/Linux
 > git clone [this repo] \
-> python compile.py
+PS (Admin)> python compile.py
 #### run program on Windows
 > .\bin\main.exe
 #### run program on MacOS/Linux
