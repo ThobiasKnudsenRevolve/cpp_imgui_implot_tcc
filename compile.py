@@ -163,7 +163,7 @@ def tcc() -> bool:
                     return False
                 
             if not cmd("make --version", shell=True) \
-            or not cmd("gcc --version", shel=True):
+            or not cmd("gcc --version", shell=True):
                 cmd("powershell -Command \"Set-ExecutionPolicy RemoteSigned -Scope CurrentUser\"", shell=True)
                 cmd("powershell -Command \"Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')\"", shell=True)
                 cmd("powershell -Command \"scoop install gcc make\"", shell=True)
