@@ -178,7 +178,7 @@ def tcc() -> bool:
                     
                 #cmd("setx PATH \"%PATH%;C:\\ProgramData\\mingw64\\install\\mingw64\\bin\" /M", cwd=cwd_win, shell=True)
 
-            cmd(f"Remove-Item -Recurse -Force .\\external\\installs\\tcc", cwd=cwd_win, shell=True)
+            cmd(f"powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\tcc\n", cwd=cwd_win, shell=True)
             bash_path = "C:\\Program Files\\Git\\bin\\bash.exe"
             os.makedirs(f"{cwd_win}\\external\\installs\\tcc")
             cmd(f"git clone https://github.com/Tiny-C-Compiler/mirror-repository .\\external\\installs\\tcc", cwd=cwd_win, capture_output=True, text=True)
