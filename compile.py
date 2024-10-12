@@ -283,7 +283,7 @@ class program:
         if not bash(f"cl --version"):
             program.choco()
             cmd("choco install visualstudio2022buildtools -y --package-parameters \"--add Microsoft.VisualStudio.Workload.VCTools\"", shell=True)
-            cmd("\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64", shell=True);
+            cmd("\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64", shell=True)
             if not bash(f"cl --version"):
                 print(Fore.RED + "could not install msvc")
                 sys.exit()
