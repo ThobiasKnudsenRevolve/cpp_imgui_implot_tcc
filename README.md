@@ -2,13 +2,11 @@
 testing c++ imgui implot tcc stack for A7 whilst also being really easy to install on any system
 
 ## Installation
-### Windows/MacoOS/Linux
+### Windows (REALLY IMPORTANT: Run PowerShell as Admin)
 > git clone [this repo] \
-PS (Admin)> python compile.py
-#### run program on Windows
+(PowerShell as Admin)> python compile.py
+#### run program
 > .\bin\main.exe
-#### run program on MacOS/Linux
-> ./bin/main
 
 ## sources
 ### ImGUI Adobe Branch
