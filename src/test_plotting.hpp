@@ -6,85 +6,40 @@
 #include <stdexcept>
 #include <limits>
 #include <unordered_set>
+#include <thread>
+#include <mutex>
+#include <chrono>
 
 #include "implot.h"
 
 using namespace std;
 
-class Channel_Map {
-private:
-    string log_id;
-    string measure;
-    string field;
-    map<float, float> data; // time, value
-public:
-    void add(float time, float value) {
-        data[time] = value;
-    }
-    void remove(float time) {
-        data.erase(time);
-    }
-    void clear() {
-        data.clear();
-    }
-    float get(float time) {
-
-        if (data.empty())
-            throw runtime_error("No data points available for interpolation.");
-        if (time <= data.begin()->first)
-            return data.begin()->second;
-        if (time >= data.rbegin()->first) 
-            return data.rbegin()->second;
-
-        auto upper = this->data.lower_bound(time);
-
-        if (upper == data.end())
-            throw runtime_error("Interpolation failed: upper bound not found.");
-        if (upper->first == time)
-            return upper->second;
-
-        auto lower = prev(upper);
-
-        float t1 = lower->first;
-        float v1 = lower->second;
-        float t2 = upper->first;
-        float v2 = upper->second;
-
-        float interpolatedValue = v1 + (v2 - v1) * (time - t1) / (t2 - t1);
-        return interpolatedValue;
-    }
-    void print() {
-        for (auto& [time, value] : data) {
-            cout << time << ": " << value << endl;
-        }
-    }
-
-};
-
 class Channel {
     
-private:
+public:
     
-    string log_id;
-    string measure;
-    string field;
-    vector<float> time = {};    // Separate vector for time
-    vector<float> value = {};   // Separate vector for value
+    std::string log_id;
+    std::string measure;
+    std::string field;
+    std::vector<double> time = {};  // Use double for time
+    std::vector<float> value = {};
     bool is_prepared = false;
     bool updated = true;
     
-public:
-    
+    std::mutex data_mutex;
+
     string name;
     
 public:
     
     Channel(const string& log_id, const string& measure, const string& field) : log_id(log_id), measure(measure), field(field) {}
-    void AddOne(const pair<float, float>& new_point) {
-        if (!time.empty() && new_point.first <= time.back()) 
+    void AddOne(const std::pair<double, float>& new_point) {
+        std::lock_guard<std::mutex> lock(data_mutex);
+        if (!time.empty() && new_point.first <= time.back())
             is_prepared = false;
         time.emplace_back(new_point.first);
         value.emplace_back(new_point.second);
+        updated = true;
     }
     void AddMultiple(const vector<pair<float, float>>& newPoints) {
         time.reserve(time.size() + newPoints.size());
@@ -96,6 +51,7 @@ public:
         is_prepared = false;
     }
     void PrepareData() {
+        std::lock_guard<std::mutex> lock(data_mutex);
         if (!is_prepared) {
             vector<size_t> indices(time.size());
             for (size_t i = 0; i < indices.size(); ++i)
@@ -104,7 +60,7 @@ public:
             sort(indices.begin(), indices.end(), [this](size_t a, size_t b) {
                 return time[a] < time[b];
             });
-            vector<float> sorted_time;
+            vector<double> sorted_time;
             vector<float> sorted_value;
             sorted_time.reserve(time.size());
             sorted_value.reserve(value.size());
@@ -174,54 +130,41 @@ public:
             cout << "Time: " << time[i] << ", Value: " << value[i] << '\n';
         }
     }
+    void GetDataForPlot(std::vector<double>& out_time, std::vector<float>& out_value) {
+        std::lock_guard<std::mutex> lock(data_mutex);
+        out_time = time;
+        out_value = value;
+    }
+
 };
 
-class CustomChannel {
-
-private:
-
-    vector<Channel>* channels_ptr = {};
-
-    vector<float> time = {};    // Separate vector for time
-    vector<float> value = {};
-
-    float (*custom_function_ptr)(float);
-
-public:
-
-
-
-}
-
-class Plotter {
-
-private:
-
-    string name;
-    vector<Channel> channels;
-    vector<CustomChannel> custom_channels;
-
-
-public:
-    void interpret(string script) {
-        // Parse the script
-        // Create channels
-        // Add channels to the plotter
+void plot(Channel& channel) {
+    std::vector<double> plot_time;
+    std::vector<float> plot_value;
+    channel.GetDataForPlot(plot_time, plot_value);
+    if (plot_time.empty() || plot_value.empty()) {
+        return;
     }
-    void plot() {
-        if (ImPlot::BeginPlot(name.c_str())) {
-            ImPlot::SetupAxes("time","");
-            ImPlot::PlotLine("f(t)", xs1, ys1, 1001);
-            ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-            ImPlot::PlotLine("g(x)", xs2, ys2, 20,ImPlotLineFlags_Segments);
-            ImPlot::EndPlot();
-        }
+    double first_time = plot_time.front();
+    std::vector<float> plot_time_float(plot_time.size());
+    for (size_t i = 0; i < plot_time.size(); ++i) {
+        plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
+    }
+    auto [min_time_iter, max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
+    auto [min_value_iter, max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
+    float min_time = (*max_time_iter - *min_time_iter)>5.0f ? *max_time_iter - 5.0f : *min_time_iter;
+    float max_time = *max_time_iter;
+    float min_value = *min_value_iter;
+    float max_value = *max_value_iter;
+    float time_range = max_time - min_time;
+    float value_range = max_value - min_value;
+    float time_padding = (time_range == 0) ? 1.0f : time_range * 0.05f; 
+    float value_padding = (value_range == 0) ? 1.0f : value_range * 0.05f;
+    if (ImPlot::BeginPlot("Data from Mocking Server")) {
+        ImPlot::SetupAxes("Time (seconds)", "Value");
+        ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
+        ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
+        ImPlot::PlotLine("vcu/102.INS.vx", plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+        ImPlot::EndPlot();
     }
 }
-
-ax = Channel("CAN_2024-07-17(102548)","vcu","INS.ax") // Channel ax("now","vcu","INS.ax")
-ay = Channel("CAN_2024-07-17(102548)","vcu","INS.ay") // Channel ay("now","vcu","INS.ax")
-f(t) = (ax(t)^2 + ay(t)^2)^(1/2) // float f(float t) { return sqrt(ax.GetValue(t)^2 + ay.GetValue(t)^2); }
-c = Channel2(t, f(t))
-
-PlotLine(t, (ax(t)^2 + ay(t)^2)^(1/2), "red")

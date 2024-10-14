@@ -13,7 +13,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "implot.h"
+#include "test_mocking_server.hpp"
 #include <stdio.h>
+#include <thread>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -119,6 +121,9 @@ int test_imgui()
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
 
+    Channel channel1("log1", "vcu", "INS.vx");
+    std::thread ws_thread(test_mocking_server, std::ref(channel1));
+
     // Main loop
 #ifdef __EMSCRIPTEN__
     // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
@@ -142,6 +147,8 @@ int test_imgui()
         ImGui::NewFrame();
 
         ImPlot::ShowDemoWindow();
+
+        plot(channel1);
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
