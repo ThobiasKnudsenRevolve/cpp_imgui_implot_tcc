@@ -6,6 +6,7 @@ import sys
 
 cwd_win      = os.getcwd()
 cwd_bash     = cwd_win.replace("\\", "/")
+cwd_unix     = cwd_win.replace("\\", "/")
 choco        = "\"C:\\ProgramData\\chocolatey\\bin\\choco.exe\""
 make         = "\"C:\\ProgramData\\chocolatey\\bin\\make.exe\""
 make_bash    = "C:/ProgramData/chocolatey/bin/make.exe"
@@ -60,7 +61,7 @@ if platform.system() == "Windows":
         "cflags": {
             "common": "-Wall",        # Common flags for both C and C++ files
             "c": "",                  # Additional flags specific to C
-            "cpp": "-std=c++11 "      # Additional flags specific to C++
+            "cpp": "-std=c++17 "      # Additional flags specific to C++
         },
         "ldflags": "",                # Linking flags (for libraries)
         "output": {
@@ -70,6 +71,26 @@ if platform.system() == "Windows":
         },
         "src_dirs": [".\\src"],       # Allow multiple source directories
         "src_files": []               # Allow individual source files
+    }
+if platform.system() == "Linux":
+    config = {
+        "compiler": {
+            "c_compiler": "gcc",    # C compiler
+            "cpp_compiler": "g++"   # C++ compiler
+        },
+        "cflags": {
+            "common": "-Wall",       # Common flags for both C and C++ files
+            "c": "",                 # Additional flags specific to C
+            "cpp": "-std=c++17 "     # Additional flags specific to C++
+        },
+        "ldflags": "",               # Linking flags (for libraries)
+        "output": {
+            "object_dir": "./obj",   # Directory for object files
+            "binary_dir": "./bin",   # Directory for the output executable
+            "binary_name": "main"    # Name of the output binary
+        },
+        "src_dirs": ["./src"],       # Allow multiple source directories
+        "src_files": []              # Allow individual source files
     }
 
 def compile(config):
@@ -94,7 +115,7 @@ def compile(config):
         for c_file in c_files:
             src_file = os.path.join(src_dir, c_file)
             obj_file = os.path.join(obj_dir, os.path.splitext(c_file)[0] + ".o")
-            
+
             # Remove the dependency check to force recompilation
             compile_cmd = (
                 f"{config['compiler']['c_compiler']} "
@@ -102,7 +123,7 @@ def compile(config):
                 f"{config['cflags']['c']} "
                 f"-c {src_file} -o {obj_file}"
             )
-            if not cmd(compile_cmd):
+            if not cmd(compile_cmd, shell=True):
                 print(f"Failed to compile {src_file}")
                 return False
             object_files.append(obj_file)
@@ -111,7 +132,7 @@ def compile(config):
         for cpp_file in cpp_files:
             src_file = os.path.join(src_dir, cpp_file)
             obj_file = os.path.join(obj_dir, os.path.splitext(cpp_file)[0] + ".o")
-            
+
             # Remove the dependency check to force recompilation
             compile_cmd = (
                 f"{config['compiler']['cpp_compiler']} "
@@ -119,7 +140,7 @@ def compile(config):
                 f"{config['cflags']['cpp']} "
                 f"-c {src_file} -o {obj_file}"
             )
-            if not cmd(compile_cmd):
+            if not cmd(compile_cmd, shell=True):
                 print(f"Failed to compile {src_file}")
                 return False
             object_files.append(obj_file)
@@ -128,7 +149,7 @@ def compile(config):
     for src_file in config["src_files"]:
         file_ext = os.path.splitext(src_file)[1]
         obj_file = os.path.join(obj_dir, os.path.splitext(os.path.basename(src_file))[0] + ".o")
-        
+
         # Determine if it's a C or C++ file and use appropriate compiler
         if file_ext == ".c":
             compile_cmd = (
@@ -147,8 +168,8 @@ def compile(config):
         else:
             print(f"Unknown file extension for {src_file}")
             return False
-        
-        if not cmd(compile_cmd):
+
+        if not cmd(compile_cmd, shell=True):
             print(f"Failed to compile {src_file}")
             return False
         object_files.append(obj_file)
@@ -162,7 +183,7 @@ def compile(config):
         f"-o {output_executable}"
     )
 
-    if not cmd(link_cmd):
+    if not cmd(link_cmd, shell=True):
         print(f"Failed to link object files.")
         return False
 
@@ -218,31 +239,47 @@ class program:
                 print(Fore.RED + "could not install gcc")
                 sys.exit()
     def mingw32_make():
-        if not bash(f"mingw32-make --version"):
-            if not cmd(f"{mingw32_make} --version", shell=True):
-                program.choco()
-                cmd("choco install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+        if platform.system() == "Windows":
+            if not bash(f"mingw32-make --version"):
                 if not cmd(f"{mingw32_make} --version", shell=True):
+                    program.choco()
+                    cmd("choco install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+                    if not cmd(f"{mingw32_make} --version", shell=True):
+                        print(Fore.RED + "could not install mingw32_make")
+                        sys.exit()
+                env = os.environ.copy()
+                env["PATH"] = f"{mingw32_make}\\..;{env['PATH']}"
+                if not bash(f"mingw32-make --version"):
                     print(Fore.RED + "could not install mingw32_make")
                     sys.exit()
-            env = os.environ.copy()
-            env["PATH"] = f"{mingw32_make}\\..;{env['PATH']}"
-            if not bash(f"mingw32-make --version"):
-                print(Fore.RED + "could not install mingw32_make")
-                sys.exit()
+        if platform.system() == "Linux":
+            pass
+        if platform.system() == "Darwin":
+            pass
     def git():
-        if not bash(f"git --version"):
-            if not cmd(f"{git} --version", shell=True):
-                program.choco()
-                cmd("choco install git --force --installargs 'ADD_GIT_TO_PATH=System' -y", shell=True)
+        if platform.system() == "Windows":
+            if not bash(f"git --version"):
                 if not cmd(f"{git} --version", shell=True):
+                    program.choco()
+                    cmd("choco install git --force --installargs 'ADD_GIT_TO_PATH=System' -y", shell=True)
+                    if not cmd(f"{git} --version", shell=True):
+                        print(Fore.RED + "could not install git")
+                        sys.exit()
+                env = os.environ.copy()
+                env["PATH"] = f"{git}\\..;{env['PATH']}"
+                if not bash(f"git --version"):
                     print(Fore.RED + "could not install git")
                     sys.exit()
-            env = os.environ.copy()
-            env["PATH"] = f"{git}\\..;{env['PATH']}"
-            if not bash(f"git --version"):
-                print(Fore.RED + "could not install git")
-                sys.exit()
+        if platform.system() == "Linux":
+            if not cmd("git --version", shell=True):
+                cmd("sudo apt-get update", shell=True)
+                cmd("sudo apt-get install git", shell=True)
+                cmd("source ~/.bashrc")
+                if not cmd("git --version"):
+                    print("could not install git")
+                    sys.exit()
+        if platform.system() == "Darwin":
+            sys.exit()
     def cmake():
         if not bash(f"cmake --version"):
             if not cmd(f"{cmake} --version", shell=True):
@@ -298,8 +335,6 @@ class program:
             if not cmd(f"{vcpkg} --version", shell=True):
                 print(Fore.RED + "could not install vcpkg")
                 sys.exit()
-
-
 
 class library:
     def tcc() -> bool:
@@ -373,10 +408,16 @@ class library:
             config["ldflags"] += " -lglew32 -lglfw3 -lopengl32 -lgdi32 " 
             return True
         if platform.system() == "Linux":
-            pass
+
+            cmd("sudo apt-get update", shell=True)
+            cmd("sudo apt-get install libglfw3-dev libglew-dev", shell=True)
+
+            if not os.path.exists(f"{cwd_win}\\bin"):
+                os.makedirs(f"{cwd_win}\\bin")
+            config["ldflags"] += " -lglfw -lGLEW -lGL "
         if platform.system() == "Darwin":
-            pass
-    def imgui() -> bool:
+            sys.exit()
+    def imgui():
         if platform.system() == "Windows":
             program.git()
             if not os.path.exists(f"{cwd_win}\\external\\imgui"):
@@ -386,10 +427,16 @@ class library:
             config["src_files"].append(f"{cwd_win}\\external\\imgui\\backends\\imgui_impl_glfw.cpp")
             config["src_files"].append(f"{cwd_win}\\external\\imgui\\backends\\imgui_impl_opengl3.cpp")
         if platform.system() == "Linux":
-            pass
+            program.git()
+            if not os.path.exists(f"{cwd_unix}/external/imgui"):
+                cmd(f"git clone https://github.com/adobe/imgui.git {cwd_unix}/external/imgui",  shell=True)
+            config["cflags"]["common"] += f" -I{cwd_unix}/external/imgui -I{cwd_unix}/external/imgui/backends "
+            config["src_dirs"].append(f"{cwd_unix}/external/imgui")
+            config["src_files"].append(f"{cwd_unix}/external/imgui/backends/imgui_impl_glfw.cpp")
+            config["src_files"].append(f"{cwd_unix}/external/imgui/backends/imgui_impl_opengl3.cpp")
         if platform.system() == "Darwin":
-            pass
-    def implot() -> bool:
+            sys.exit()
+    def implot():
         if platform.system() == "Windows":
             program.git()
             if not os.path.exists(f"{cwd_win}\\external\\implot"):
@@ -397,9 +444,13 @@ class library:
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\implot -I{cwd_win}\\external\\implot\\backends "
             config["src_dirs"].append(f"{cwd_win}\\external\\implot")
         if platform.system() == "Linux":
-            pass
+            program.git()
+            if not os.path.exists(f"{cwd_unix}/external/implot"):
+                cmd(f"git clone https://github.com/epezent/implot.git {cwd_unix}/external/implot", shell=True)
+            config["cflags"]["common"] += f" -I{cwd_unix}/external/implot -I{cwd_unix}/external/implot/backends "
+            config["src_dirs"].append(f"{cwd_unix}/external/implot")
         if platform.system() == "Darwin":
-            pass
+            sys.exit()
     def curl() -> bool:
         if platform.system() == "Windows":
                 
@@ -450,7 +501,7 @@ class library:
             pass
         if platform.system() == "Darwin":
             pass
-    def websocketpp():
+    def websocket():
         if platform.system() == "Windows":
             if not os.path.exists(f"{cwd_win}\\external\\vcpkg\\installed\\x64-windows\\lib") or True:
                 program.vcpkg()
@@ -459,15 +510,22 @@ class library:
                 if not os.path.exists(f"{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\lib"):
                     print(Fore.RED + "Could not install websocketpp:x64-windows-static")
                     sys.exit()
-            
+
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\include "
-            config["ldflags"] += f"-L{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\lib \
-                -lboost_system-vc143-mt-x64-1_85 -lboost_context-vc143-mt-x64-1_85 -lboost_coroutine-vc143-mt-x64-1_85 -lboost_thread-vc143-mt-x64-1_85 -lws2_32"    
-                
+            config["ldflags"] += f" -lboost_system -lboost_thread -lpthread "
+
         if platform.system() == "Linux":
-            pass
+            if not cmd("dpkg -l | grep libboost-all-dev", shell=True) \
+            or not cmd("dpkg -l | grep libwebsocketpp-dev", shell=True):
+                cmd("sudo apt-get update", shell=True)
+                cmd("sudo apt-get install libboost-all-dev", shell=True)
+                cmd("sudo apt-get install libwebsocketpp-dev", shell=True)
+                if not cmd("dpkg -l | grep libboost-all-dev", shell=True) \
+                or not cmd("dpkg -l | grep libwebsocketpp-dev", shell=True):
+                    print("could not install websocket")
+                    sys.exit()
         if platform.system() == "Darwin":
-            pass
+            sys.exit()
     def json():
         if platform.system() == "Windows":
             if not os.path.exists(f"{cwd_win}\\external\\json"):
@@ -478,17 +536,26 @@ class library:
                     sys.exit()
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\json\\include "
         if platform.system() == "Linux":
-            pass
+            if not os.path.exists(f"{cwd_unix}/external/json"):
+                program.git()
+                cmd(f"git clone https://github.com/nlohmann/json.git {cwd_unix}/external/json", shell=True, capture_output=True, text=True)
+                if not os.path.exists(f"{cwd_unix}/external/json"):
+                    print(Fore.RED + "Could not install json")
+                    sys.exit()
+            config["cflags"]["common"] += f" -I{cwd_unix}/external/json/include "
         if platform.system() == "Darwin":
             pass
 
 
 if __name__ == "__main__":
-    library.tcc()
+    #library.tcc()
     library.opengl()
     library.imgui()
     library.implot()
     library.json()
-    library.websocketpp()
+    library.websocket()
+    cmd("g++ --version", shell=True)
 
     compile(config)
+
+

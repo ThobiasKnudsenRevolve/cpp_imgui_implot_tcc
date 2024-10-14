@@ -121,24 +121,17 @@ int test_imgui()
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.1f, 0.1f, 0.1f, 1.00f);
 
-    Channel channel1("log1", "vcu", "INS.vx");
-    std::thread ws_thread(test_mocking_server, std::ref(channel1));
+    DataManager data_manager_1;
+    std::thread ws_thread(test_mocking_server, std::ref(data_manager_1));
 
     // Main loop
 #ifdef __EMSCRIPTEN__
-    // For an Emscripten build we are disabling file-system access, so let's not attempt to do a fopen() of the imgui.ini file.
-    // You may manually call LoadIniSettingsFromMemory() to load settings from your own storage.
     io.IniFilename = nullptr;
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
     while (!glfwWindowShouldClose(window))
 #endif
     {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
 
         // Start the Dear ImGui frame
@@ -148,7 +141,7 @@ int test_imgui()
 
         ImPlot::ShowDemoWindow();
 
-        plot(channel1);
+        data_manager_1.Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)

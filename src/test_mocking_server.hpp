@@ -17,52 +17,35 @@ const std::string uri = "ws://localhost:8080/ws/datastream";
 
 std::mutex channel_mutex; // Mutex for thread safety
 
-void test_mocking_server(Channel& channel) {
+void test_mocking_server(DataManager& data_manager) {
     client c;
 
     try {
         std::cout << "Initializing WebSocket++ client..." << std::endl;
-
-        // Disable logging (optional)
         c.clear_access_channels(websocketpp::log::alevel::all);
         c.clear_error_channels(websocketpp::log::elevel::all);
-
-        // Initialize ASIO
         c.init_asio();
-
-        // Set message handler
-        c.set_message_handler([&c, &channel](websocketpp::connection_hdl hdl, client::message_ptr msg) {
+        c.set_message_handler([&c, &data_manager](websocketpp::connection_hdl hdl, client::message_ptr msg) {
             std::string payload = msg->get_payload();
-            //std::cout << "Received message: " << payload << std::endl;
-
             try {
-                // Parse JSON message
-                json dataMessage = json::parse(payload);
-                if (!dataMessage.contains("timestamp") || !dataMessage["timestamp"].is_number()) {
-                    std::cerr << "Invalid or missing 'timestamp' field." << std::endl;
+                json data_message = json::parse(payload);
+                if (!data_message.contains("timestamp") || !data_message["timestamp"].is_number()) {
+                    printf("Invalid or missing 'timestamp' field.");
                     return;
                 }
-                double time = dataMessage["timestamp"].get<double>();
-                float value;
-                bool value_exists = false;
-                if (dataMessage.contains("data") && dataMessage["data"].is_object()) {
-                    json dataObject = dataMessage["data"];
-                    if (dataObject.contains("vcu/115.InsEstimates2.yaw_rate") && !dataObject["vcu/115.InsEstimates2.yaw_rate"].is_null()) {
-                        if (dataObject["vcu/115.InsEstimates2.yaw_rate"].is_number()) {
-                            value = dataObject["vcu/115.InsEstimates2.yaw_rate"].get<float>();
-                            value_exists = true;
+                double time = data_message["timestamp"].get<double>();
+                if (data_message.contains("data") && data_message["data"].is_object()) {
+
+                    json data_object = data_message["data"];
+
+                    for (auto& [tag, value] : data_object.items()) {
+                        if (!value.is_number())
+                            continue;
+                        {
+                            std::lock_guard<std::mutex> lock(channel_mutex);
+                            data_manager.AddDatapoint("live", {tag}, time, value);
                         }
                     }
-                }
-
-                // Add data to the channel if value exists
-                if (value_exists) {
-                    {
-                        std::lock_guard<std::mutex> lock(channel_mutex);
-                        channel.AddOne({time, value});
-                        channel.updated = true;
-                    }
-                    std::cout << "Added data point: time=" << time << ", value=" << value << std::endl;
                 }
             }
             catch (json::parse_error& e) {

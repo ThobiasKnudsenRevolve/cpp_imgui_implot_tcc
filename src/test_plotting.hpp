@@ -19,8 +19,7 @@ class Channel {
 public:
     
     std::string log_id;
-    std::string measure;
-    std::string field;
+    std::vector<std::string> tags = {};
     std::vector<double> time = {};  // Use double for time
     std::vector<float> value = {};
     bool is_prepared = false;
@@ -32,8 +31,18 @@ public:
     
 public:
     
-    Channel(const string& log_id, const string& measure, const string& field) : log_id(log_id), measure(measure), field(field) {}
-    void AddOne(const std::pair<double, float>& new_point) {
+    Channel(const string& log_id, const std::vector<std::string>& tags) : log_id(log_id), tags(tags) {}
+    Channel(const Channel&) = delete;
+    Channel& operator=(const Channel&) = delete;
+    Channel(Channel&&) = delete;
+    Channel& operator=(Channel&&) = delete;
+    std::string GetLogId() {
+        return log_id;
+    }
+    std::vector<std::string> GetTags() {
+        return tags;
+    }
+    void AddDatapoint(const std::pair<double, float>& new_point) {
         std::lock_guard<std::mutex> lock(data_mutex);
         if (!time.empty() && new_point.first <= time.back())
             is_prepared = false;
@@ -41,7 +50,7 @@ public:
         value.emplace_back(new_point.second);
         updated = true;
     }
-    void AddMultiple(const vector<pair<float, float>>& newPoints) {
+    void AddDatapoints(const vector<pair<float, float>>& newPoints) {
         time.reserve(time.size() + newPoints.size());
         value.reserve(value.size() + newPoints.size());
         for (const auto& p : newPoints) {
@@ -135,36 +144,111 @@ public:
         out_time = time;
         out_value = value;
     }
+    void Plot() {
+        std::vector<double> plot_time;
+        std::vector<float> plot_value;
+        GetDataForPlot(plot_time, plot_value);
+        if (plot_time.empty() || plot_value.empty()) {
+            return;
+        }
+        double first_time = plot_time.front();
+        std::vector<float> plot_time_float(plot_time.size());
+        for (size_t i = 0; i < plot_time.size(); ++i) {
+            plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
+        }
+        auto [min_time_iter, max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
+        auto [min_value_iter, max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
+        float min_time = (*max_time_iter - *min_time_iter)>5.0f ? *max_time_iter - 5.0f : *min_time_iter;
+        float max_time = *max_time_iter;
+        float min_value = *min_value_iter;
+        float max_value = *max_value_iter;
+        float time_range = max_time - min_time;
+        float value_range = max_value - min_value;
+        float time_padding = (time_range == 0) ? 1.0f : time_range * 0.05f;
+        float value_padding = (value_range == 0) ? 1.0f : value_range * 0.05f;
+        if (ImPlot::BeginPlot("Data from Mocking Server")) {
+            ImPlot::SetupAxes("Time (seconds)", "Value");
+            ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
+            ImPlot::PlotLine("test", plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            ImPlot::EndPlot();
+        }
+    }
 
 };
 
-void plot(Channel& channel) {
-    std::vector<double> plot_time;
-    std::vector<float> plot_value;
-    channel.GetDataForPlot(plot_time, plot_value);
-    if (plot_time.empty() || plot_value.empty()) {
-        return;
+class DataManager {
+
+public:
+
+    std::vector<std::unique_ptr<Channel>> channels = {};
+
+public:
+
+    Channel* GetChannelPtr(std::string log_id, std::vector<std::string> tags) {
+        std::sort(tags.begin(), tags.end());
+        for (const auto& channel_ptr  : channels) {
+            if (channel_ptr->GetLogId() == log_id && channel_ptr->GetTags() == tags) {
+                return channel_ptr.get();
+            }
+        }
+        return nullptr;
     }
-    double first_time = plot_time.front();
-    std::vector<float> plot_time_float(plot_time.size());
-    for (size_t i = 0; i < plot_time.size(); ++i) {
-        plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
+    Channel* GetChannelPtr1(std::string log_id, std::vector<std::string> tags) {
+        std::sort(tags.begin(), tags.end());
+        for (const auto& channel_ptr  : channels) {
+            if (channel_ptr->GetLogId() == log_id && channel_ptr->GetTags() == tags) {
+                return channel_ptr.get();
+            }
+            if (channel_ptr->GetTags() == tags) {
+                printf("found correct log_id = |%s|%s\n", log_id.c_str(), channel_ptr->GetLogId().c_str());
+                printf("found correct tags = %s\n", tags[0].c_str());
+            }
+        }
+        return nullptr;
     }
-    auto [min_time_iter, max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
-    auto [min_value_iter, max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
-    float min_time = (*max_time_iter - *min_time_iter)>5.0f ? *max_time_iter - 5.0f : *min_time_iter;
-    float max_time = *max_time_iter;
-    float min_value = *min_value_iter;
-    float max_value = *max_value_iter;
-    float time_range = max_time - min_time;
-    float value_range = max_value - min_value;
-    float time_padding = (time_range == 0) ? 1.0f : time_range * 0.05f; 
-    float value_padding = (value_range == 0) ? 1.0f : value_range * 0.05f;
-    if (ImPlot::BeginPlot("Data from Mocking Server")) {
-        ImPlot::SetupAxes("Time (seconds)", "Value");
-        ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
-        ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
-        ImPlot::PlotLine("vcu/102.INS.vx", plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
-        ImPlot::EndPlot();
+
+    bool AddDatapoint(std::string log_id, std::vector<std::string> tags, double time, float value) {
+
+        //printf("%s %f %f\n", tags[0].c_str(), time, value);
+        std::sort(tags.begin(), tags.end());
+        Channel* channel_ptr = GetChannelPtr(log_id, tags);
+        if (!channel_ptr) {
+            channel_ptr = CreateNewChannel(log_id, tags);
+            printf("%s ", log_id.c_str());
+            for (auto tag : tags)
+                printf("%s ", tag.c_str());
+            printf("|\n");
+        }
+        if (!channel_ptr) {
+            printf("ERROR: could not find ptr to newly created channel\n");
+            return false;
+        }
+        channel_ptr->AddDatapoint({time, value});
+        //printf("SUCCESS: added one data point");
+        return true;
     }
-}
+
+    Channel* CreateNewChannel(std::string log_id, std::vector<std::string> tags) {
+        std::sort(tags.begin(), tags.end());
+        channels.emplace_back(std::make_unique<Channel>(log_id, tags));
+        return channels.back().get();
+    }
+
+    void PrintData() {
+        for (const auto& channel_ptr : channels) {
+            channel_ptr->PrintData();
+        }
+    }
+
+    void Plot(std::string log_id, std::vector<std::string> tags) {
+        std::sort(tags.begin(), tags.end());
+        Channel* channel_ptr = GetChannelPtr1(log_id, tags);
+        if (channel_ptr) {
+            channel_ptr->Plot();
+            return;
+        }
+        printf("did not find channel ptr\n");
+    }
+
+};
