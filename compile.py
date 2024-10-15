@@ -8,6 +8,7 @@ cwd_win      = os.getcwd()
 cwd_bash     = cwd_win.replace("\\", "/")
 cwd_unix     = cwd_win.replace("\\", "/")
 choco        = "\"C:\\ProgramData\\chocolatey\\bin\\choco.exe\""
+curl         = "\"C:\\ProgramData\\chocolatey\\bin\\curl.exe\""
 make         = "\"C:\\ProgramData\\chocolatey\\bin\\make.exe\""
 make_bash    = "C:/ProgramData/chocolatey/bin/make.exe"
 cmake        = "\"C:\\Program Files\\CMake\\bin\\cmake.exe\""
@@ -23,6 +24,51 @@ bash_bash    = "C:/Program Files/Git/bin/bash.exe"
 _7zip        = "C:\\Program Files\\7-Zip\\7z.exe"
 cl           = "\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat\""
 vcpkg        = f"\"{cwd_win}\\external\\vcpkg\\vcpkg.exe\""
+def cl_exe_path():
+    vswhere_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe"
+    if not os.path.isfile(vswhere_path):
+        print("vswhere.exe not found at expected location.")
+        return None
+    try:
+        output = subprocess.check_output([
+            vswhere_path,
+            "-latest",
+            "-products", "*",
+            "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            "-property", "installationPath",
+            "-format", "value"
+        ], encoding='utf-8', errors='ignore')
+    except subprocess.CalledProcessError as e:
+        print("Error running vswhere.exe:", e)
+        return None
+    installation_path = output.strip()
+    if not installation_path:
+        print("No installation path found.")
+        return None
+    print("Visual Studio installation path:", installation_path)
+    msvc_tools_path = os.path.join(installation_path, "VC\\Tools\\MSVC")
+    if not os.path.isdir(msvc_tools_path):
+        print("MSVC tools directory not found.")
+        return None
+    version_dirs = os.listdir(msvc_tools_path)
+    if not version_dirs:
+        print("No MSVC version directories found.")
+        return None
+    version_dirs.sort(reverse=True)
+    latest_version = version_dirs[0]
+    print("Latest MSVC version:", latest_version)
+    cl_exe_path = os.path.join(
+        msvc_tools_path,
+        latest_version,
+        r"bin\Hostx64\x64\cl.exe"
+    )
+    if os.path.isfile(cl_exe_path):
+        print("Found cl.exe at:", cl_exe_path)
+        return cl_exe_path
+    else:
+        print("cl.exe not found at expected location.")
+        return None
+
 
 init(autoreset=True)
 def cmd(*args, **kwargs) -> bool:
@@ -193,9 +239,7 @@ def compile(config):
 class program:
     def choco():
         if not cmd(f"{choco} --version", shell=True):
-            cmd("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"", shell=True)  
-            cmd("Import-Module $env:ChocolateyInstall\\helpers\\chocolateyProfile.psm1", shell=True)
-            cmd("refreshenv", shell=True)
+            cmd("powershell -Command \"Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))\"", shell=True) 
         if not cmd(f"{choco} --version", shell=True):
             print(Fore.RED + "could not install choco")
             sys.exit()
@@ -203,7 +247,7 @@ class program:
         if not bash(f"make --version"):
             if not cmd(f"{make} --version", shell=True):
                 program.choco()
-                cmd("choco install make  --installargs 'ADD_MAKE_TO_PATH=System' -y", shell=True)
+                cmd(f"{choco} install make  --installargs 'ADD_MAKE_TO_PATH=System' -y", shell=True)
                 if not cmd(f"{make} --version", shell=True):
                     print(Fore.RED + "could not install make")
                     sys.exit()
@@ -216,12 +260,13 @@ class program:
         if not bash(f"g++ --version"):
             if not cmd(f"{gpp} --version", shell=True):
                 program.choco()
-                cmd("choco install mingw  --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+                cmd(f"{choco} install mingw  --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
                 if not cmd(f"{gpp} --version", shell=True):
                     print(Fore.RED + "could not install gpp")
                     sys.exit()
                 env = os.environ.copy()
                 env["PATH"] = f"{gpp}\\..;{env['PATH']}"
+                cmd("refreshenv", shell=True)
                 if not bash(f"g++ --version"):
                     print(Fore.RED + "could not install g++")
                     sys.exit()
@@ -229,7 +274,7 @@ class program:
         if not bash(f"gcc --version"):
             if not cmd(f"{gcc} --version", shell=True):
                 program.choco()
-                cmd("choco install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+                cmd(f"{choco} install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
                 if not cmd(f"{gcc} --version", shell=True):
                     print(Fore.RED + "could not install gcc")
                     sys.exit()
@@ -238,12 +283,19 @@ class program:
             if not bash(f"gcc --version"):
                 print(Fore.RED + "could not install gcc")
                 sys.exit()
+    def curl():
+        if not cmd(f"{curl} --version", shell=True):
+            program.choco()
+            cmd(f"{choco} install curl -y", shell=True)
+            if not cmd(f"{curl} --version", shell=True):
+                print(Fore.RED + "could not install curl")
+                sys.exit()
     def mingw32_make():
         if platform.system() == "Windows":
             if not bash(f"mingw32-make --version"):
                 if not cmd(f"{mingw32_make} --version", shell=True):
                     program.choco()
-                    cmd("choco install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+                    cmd(f"{choco} install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
                     if not cmd(f"{mingw32_make} --version", shell=True):
                         print(Fore.RED + "could not install mingw32_make")
                         sys.exit()
@@ -261,7 +313,7 @@ class program:
             if not bash(f"git --version"):
                 if not cmd(f"{git} --version", shell=True):
                     program.choco()
-                    cmd("choco install git --force --installargs 'ADD_GIT_TO_PATH=System' -y", shell=True)
+                    cmd(f"{choco} install git --force --installargs 'ADD_GIT_TO_PATH=System' -y", shell=True)
                     if not cmd(f"{git} --version", shell=True):
                         print(Fore.RED + "could not install git")
                         sys.exit()
@@ -284,8 +336,8 @@ class program:
         if not bash(f"cmake --version"):
             if not cmd(f"{cmake} --version", shell=True):
                 program.choco()
-                cmd("choco uninstall cmake -y",  shell=True)
-                cmd("choco install cmake --force --installargs 'ADD_CMAKE_TO_PATH=System' -y",  shell=True)
+                cmd(f"{choco} uninstall cmake -y",  shell=True)
+                cmd(f"{choco} install cmake --force --installargs 'ADD_CMAKE_TO_PATH=System' -y",  shell=True)
                 if not cmd(f"{cmake} --version", shell=True):
                     print(Fore.RED + "could not install cmake")
                     sys.exit()
@@ -297,8 +349,8 @@ class program:
     def openssl():
         if not cmd(f"{openssl} --version", shell=True):
             program.choco()
-            cmd("choco uninstall openssl -y", shell=True)
-            cmd("choco install openssl --force --installargs 'ADD_OPENSSL_TO_PATH=System' -y", shell=True)
+            cmd(f"{choco} uninstall openssl -y", shell=True)
+            cmd(f"{choco} install openssl --force --installargs 'ADD_OPENSSL_TO_PATH=System' -y", shell=True)
             if not cmd(f"{openssl} --version", shell=True):
                 print(Fore.RED + "could not install openssl")
                 sys.exit()
@@ -306,8 +358,8 @@ class program:
         if not bash(f"7z"):
             if not cmd(f"\"{_7zip}\"", shell=True):
                 program.choco()
-                cmd("choco uninstall 7zip -y",  shell=True)
-                cmd("choco install 7zip --force -y",  shell=True)
+                cmd(f"{choco} uninstall 7zip -y",  shell=True)
+                cmd(f"{choco} install 7zip --force -y",  shell=True)
                 if not cmd(f"\"{_7zip}\"", shell=True):
                     print(Fore.RED + "could not install 7zip")
                     sys.exit()
@@ -317,27 +369,42 @@ class program:
                 print(Fore.RED + "could not install 7zip")
                 sys.exit()
     def msvc():
-        if not bash(f"cl --version"):
+        if not cmd("cl", shell=True):
             program.choco()
-            cmd("choco install visualstudio2022buildtools -y --package-parameters \"--add Microsoft.VisualStudio.Workload.VCTools\"", shell=True)
+            #cmd(f"{choco} uninstall -n visualstudio2022buildtools -y", shell=True)
+            cmd(f"{choco} install visualstudio2022buildtools -y --package-parameters \"--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --includeOptional\"", shell=True)
             cmd("\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Auxiliary\\Build\\vcvarsall.bat\" x64", shell=True)
-            if not bash(f"cl --version"):
+            cmd(f"setx /M PATH \"%PATH%;{cl_exe_path()}\\..\"", shell=True)
+            cmd("refreshenv", shell=True)
+            if cl_exe_path() == None:
+                print(Fore.RED + "could not find cl full path")
+                sys.exit()
+            if not cmd("cl", shell=True):
                 print(Fore.RED + "could not install msvc")
                 sys.exit()
     def vcpkg():
         if not cmd(f"{vcpkg} --version", shell=True):
             program.git()
+            program.msvc()
             if os.path.exists(f"{cwd_win}\\external\\vcpkg"):
                 bash(f"rm -rf {cwd_win}\\external\\vcpkg")
+            
+            cmd(f"powershell -Command \"Remove-Item -Recurse -Force {cwd_win}\\external\\vcpkg\"", shell=True)
             cmd(f"mkdir {cwd_win}\\external\\vcpkg", shell=True)
             cmd(f"git clone https://github.com/microsoft/vcpkg.git {cwd_win}\\external\\vcpkg", shell=True)
             cmd(f".\\bootstrap-vcpkg.bat", cwd=f"{cwd_win}\\external\\vcpkg", shell=True)
             if not cmd(f"{vcpkg} --version", shell=True):
                 print(Fore.RED + "could not install vcpkg")
                 sys.exit()
+        else:
+            program.git()
+            if not cmd(f"{git} pull", cwd=f"{cwd_win}\\external\\vcpkg", shell=True):
+                sys.exit()
+            if not cmd(".\\vcpkg update", cwd=f"{cwd_win}\\external\\vcpkg", shell=True):
+                sys.exit()
 
 class library:
-    def tcc() -> bool:
+    def tcc():
         if platform.system() == "Windows":
             if not os.path.exists(f"{cwd_win}\\include") \
             or not os.path.exists(f"{cwd_win}\\lib") \
@@ -368,52 +435,48 @@ class library:
                 or not os.path.exists(f"{cwd_win}\\libtcc") \
                 or not os.path.exists(f"{cwd_win}\\libtcc.dll"):
                     print(Fore.RED + "Could not install TinyCC.")
-                    return False
+                    sys.exit()
                 print(Fore.GREEN + "TinyCC built successfully in the local folder.\n")
             config["cflags"]["common"] += " -I libtcc "
             config["ldflags"] += " libtcc.dll " 
-            return True
+            
         if platform.system() == "Linux":
             pass
         if platform.system() == "Darwin":
             pass
-    def opengl() -> bool:
+    def opengl():
         if platform.system() == "Windows":
-            if not os.path.exists(f"{cwd_win}\\external\\glew") \
-            or not os.path.exists(f"{cwd_win}\\external\\glfw"):
+            if not os.path.exists(f"{cwd_win}\\bin\\glew32.dll") \
+            or not os.path.exists(f"{cwd_win}\\bin\\glfw3.dll"):
                 
                 program.git()
+                program.curl()
                     
                 cmd(f"powershell -Command \"Remove-Item -Recurse -Force {cwd_win}\\external\\installs\\glfw.zip\"", shell=True)
-                cmd(f"curl -L -o {cwd_win}\\external\\installs\\glfw.zip https://sourceforge.net/projects/glfw/files/glfw/3.3.10/glfw-3.3.10.bin.WIN64.zip/download", shell=True)
-                cmd(f"powershell -Command \"Expand-Archive -Path {cwd_win}\\external\\installs\\glfw.zip -DestinationPath {cwd_win}\\external\\glfw\"", shell=True)
+                cmd(f"mkdir \"{cwd_win}\\external\\installs\"", shell=True)
+                cmd(f"{curl} -L -o \"{cwd_win}\\external\\installs\\glfw.zip\" \"https://sourceforge.net/projects/glfw/files/glfw/3.3.10/glfw-3.3.10.bin.WIN64.zip/download\"", shell=True)
+                cmd(f"powershell -Command \"Expand-Archive -Force -Path {cwd_win}\\external\\installs\\glfw.zip -DestinationPath {cwd_win}\\external\\glfw\"", shell=True)
                     
                 cmd(f"powershell -Command \"Remove-Item -Recurse -Force .\\external\\installs\\glew.zip\"", shell=True)
-                cmd(f"curl -L -o {cwd_win}\\external\\installs\\glew.zip https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0-win32.zip/download", capture_output=True, text=True)
-                cmd(f"powershell -Command \"Expand-Archive -Path {cwd_win}\\external\\installs\\glew.zip -DestinationPath {cwd_win}\\external\\glew\"", capture_output=True, text=True)
+                cmd(f"{curl} -L -o \"{cwd_win}\\external\\installs\\glew.zip\" \"https://sourceforge.net/projects/glew/files/glew/2.1.0/glew-2.1.0-win32.zip/download\"", shell=True)
+                cmd(f"powershell -Command \"Expand-Archive -Force -Path {cwd_win}\\external\\installs\\glew.zip -DestinationPath {cwd_win}\\external\\glew\"", capture_output=True, text=True)
 
-                if not os.path.exists(f"{cwd_win}\\external\\glew") \
-                or not os.path.exists(f"{cwd_win}\\external\\glfw"):
+                if not os.path.exists(f"{cwd_win}\\bin"):
+                    os.makedirs(f"{cwd_win}\\bin")
+                bash(f"cp {cwd_bash}/external/glew/glew-2.1.0/bin/Release/x64/glew32.dll {cwd_bash}/bin")
+                bash(f"cp {cwd_bash}/external/glfw/glfw-3.3.10.bin.WIN64/lib-mingw-w64/glfw3.dll {cwd_bash}/bin")
+                if not os.path.exists(f"{cwd_win}\\bin\\glew32.dll") \
+                or not os.path.exists(f"{cwd_win}\\bin\\glfw3.dll"):
                     print(Fore.RED + "Could not build OpenGL")
-                    return False
-                
+                    sys.exit()
                 print(Fore.GREEN + "OpenGL buildt successfully in local folder\n")
-
-            if not os.path.exists(f"{cwd_win}\\bin"):
-                os.makedirs(f"{cwd_win}\\bin")
-            bash(f"cp {cwd_bash}/external/glew/glew-2.1.0/bin/Release/x64/glew32.dll {cwd_bash}/bin")
-            bash(f"cp {cwd_bash}/external/glfw/glfw-3.3.10.bin.WIN64/lib-mingw-w64/glfw3.dll {cwd_bash}/bin")
+            
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\glfw\\glfw-3.3.10.bin.WIN64\\include -I{cwd_win}\\external\\glew\\glew-2.1.0\\include "
             config["ldflags"] += f" -L{cwd_win}\\external\\glfw\\glfw-3.3.10.bin.WIN64\\lib-mingw-w64 -L{cwd_win}\\external\\glew\\glew-2.1.0\\lib\\Release\\x64 " 
             config["ldflags"] += " -lglew32 -lglfw3 -lopengl32 -lgdi32 " 
-            return True
         if platform.system() == "Linux":
-
             cmd("sudo apt-get update", shell=True)
             cmd("sudo apt-get install libglfw3-dev libglew-dev", shell=True)
-
-            if not os.path.exists(f"{cwd_win}\\bin"):
-                os.makedirs(f"{cwd_win}\\bin")
             config["ldflags"] += " -lglfw -lGLEW -lGL "
         if platform.system() == "Darwin":
             sys.exit()
@@ -451,7 +514,7 @@ class library:
             config["src_dirs"].append(f"{cwd_unix}/external/implot")
         if platform.system() == "Darwin":
             sys.exit()
-    def curl() -> bool:
+    def curl():
         if platform.system() == "Windows":
                 
             if not os.path.exists(f"{cwd_win}\\include\\curl\\curl.h") \
@@ -485,7 +548,8 @@ class library:
                 program._7zip()
                 program.msvc()
 
-                #cmd(f"curl -L https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.zip --output {cwd_win}\\external\\installs\\boost\\boost_1_81_0.zip", shell=True)
+                #program.curl()
+                #cmd(f"{curl} -L https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.zip --output {cwd_win}\\external\\installs\\boost\\boost_1_81_0.zip", shell=True)
                 #cmd(f"\"{_7zip}\" x {cwd_win}\\external\\installs\\boost\\boost_1_81_0.zip -o{cwd_win}\\external\\installs\\boost\\boost_1_81_0", shell=True)
                 cmd(f".\\bootstrap.bat",cwd=f"{cwd_win}\\external\\installs\\boost\\boost_1_81_0", shell=True)
                 #if not os.path.exists(f"{cwd_win}\\external\\boost"): 
@@ -512,7 +576,8 @@ class library:
                     sys.exit()
 
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\include "
-            config["ldflags"] += f" -lboost_system -lboost_thread -lpthread "
+            config["ldflags"] += f"-L{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\lib \
+                -lboost_system-vc143-mt-x64-1_85 -lboost_context-vc143-mt-x64-1_85 -lboost_coroutine-vc143-mt-x64-1_85 -lboost_thread-vc143-mt-x64-1_85 -lws2_32" 
 
         if platform.system() == "Linux":
             if not cmd("dpkg -l | grep libboost-all-dev", shell=True) \
@@ -549,11 +614,13 @@ class library:
 
 if __name__ == "__main__":
     #library.tcc()
+    program.gpp()
     library.opengl()
     library.imgui()
     library.implot()
     library.json()
     library.websocket()
+
     cmd("g++ --version", shell=True)
 
     compile(config)
