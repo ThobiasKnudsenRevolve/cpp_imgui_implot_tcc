@@ -141,7 +141,8 @@ int test_imgui()
 
         ImPlot::ShowDemoWindow();
 
-        data_manager_1.Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});
+        data_manager_1.PlotTable();
+
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)

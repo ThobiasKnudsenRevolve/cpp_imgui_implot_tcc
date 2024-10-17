@@ -251,4 +251,32 @@ public:
         printf("did not find channel ptr\n");
     }
 
+    void PlotHistogram() {
+        std::vector<float> data = {};
+        for (float y = 0.f; y < 100.f; y+=1.f) {
+            for (float x = 0.f; x < 100.f; x+=1.f) {
+                if (sqrt(pow(x-50.f,2) + pow(y-50.f,2)) <= 50.f) {
+                    data.push_back(x);
+                }
+            }
+        }
+        if (ImPlot::BeginPlot("Normal Distribution Histogram", "Value", "Frequency")) {
+            ImPlot::PlotHistogram("Histogram", data.data(), static_cast<int>(data.size()), 200, 1.0, ImPlotRange{0.f, 100.f}, 0);
+            ImPlot::EndPlot();
+        }
+    }
+
+    void PlotTable() {
+        ImGui::Begin("Plot Window");
+        if (ImGui::BeginTabBar("MainTabBar")) {
+            if (ImGui::BeginTabItem("Plots")) {
+                if (ImGui::TreeNodeEx("Plot")) {Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("Histogram")) {PlotHistogram();ImGui::TreePop();}
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+        ImGui::End();
+    }
+
 };
