@@ -151,6 +151,56 @@ def compile(config):
 
     object_files = []
 
+    # Function to check if recompilation is needed
+    def needs_recompilation(obj_file, dep_file):
+        if not os.path.exists(obj_file):
+            return True
+        if not os.path.exists(dep_file):
+            return True
+
+        obj_mtime = os.path.getmtime(obj_file)
+        deps = []
+
+        # Read and parse the dependency file
+        try:
+            with open(dep_file, 'r') as f:
+                content = f.read()
+                # Remove line continuations
+                content = content.replace('\\\n', '')
+                # Split dependencies
+                parts = content.split(':', 1)
+                if len(parts) != 2:
+                    return True  # Malformed dep file; force recompilation
+                dep_list = parts[1].strip().split()
+                deps.extend(dep_list)
+        except Exception as e:
+            print(f"Error reading dependency file {dep_file}: {e}")
+            return True  # Force recompilation if dep file is unreadable
+
+        for dep in deps:
+            if os.path.exists(dep):
+                if os.path.getmtime(dep) > obj_mtime:
+                    return True
+            else:
+                # If a dependency doesn't exist, force recompilation
+                return True
+        return False
+
+    # Function to compile a source file
+    def compile_source(src_file, compiler, cflags, obj_file):
+        dep_file = obj_file + '.d'
+        compile_cmd = (
+            f"{compiler} "
+            f"{cflags} "
+            f"-MMD -MF {dep_file} "
+            f"-c {src_file} -o {obj_file}"
+        )
+        if not cmd(compile_cmd, shell=True):
+            print(f"Failed to compile {src_file}")
+            return False
+        print(f"Compiled {src_file} into {obj_file}")
+        return True
+
     # Iterate over multiple source directories
     for src_dir in config["src_dirs"]:
         # Get list of C and C++ source files
@@ -161,79 +211,87 @@ def compile(config):
         for c_file in c_files:
             src_file = os.path.join(src_dir, c_file)
             obj_file = os.path.join(obj_dir, os.path.splitext(c_file)[0] + ".o")
+            dep_file = obj_file + '.d'
 
-            # Remove the dependency check to force recompilation
-            compile_cmd = (
-                f"{config['compiler']['c_compiler']} "
-                f"{config['cflags']['common']} "
-                f"{config['cflags']['c']} "
-                f"-c {src_file} -o {obj_file}"
-            )
-            if not cmd(compile_cmd, shell=True):
-                print(f"Failed to compile {src_file}")
-                return False
+            cflags = f"{config['cflags']['common']} {config['cflags']['c']}"
+            compiler = config['compiler']['c_compiler']
+
+            if needs_recompilation(obj_file, dep_file):
+                if not compile_source(src_file, compiler, cflags, obj_file):
+                    return False
+            else:
+                print(f"Skipping compilation of {src_file}; up-to-date.")
             object_files.append(obj_file)
 
         # Compile C++ files
         for cpp_file in cpp_files:
             src_file = os.path.join(src_dir, cpp_file)
             obj_file = os.path.join(obj_dir, os.path.splitext(cpp_file)[0] + ".o")
+            dep_file = obj_file + '.d'
 
-            # Remove the dependency check to force recompilation
-            compile_cmd = (
-                f"{config['compiler']['cpp_compiler']} "
-                f"{config['cflags']['common']} "
-                f"{config['cflags']['cpp']} "
-                f"-c {src_file} -o {obj_file}"
-            )
-            if not cmd(compile_cmd, shell=True):
-                print(f"Failed to compile {src_file}")
-                return False
+            cflags = f"{config['cflags']['common']} {config['cflags']['cpp']}"
+            compiler = config['compiler']['cpp_compiler']
+
+            if needs_recompilation(obj_file, dep_file):
+                if not compile_source(src_file, compiler, cflags, obj_file):
+                    return False
+            else:
+                print(f"Skipping compilation of {src_file}; up-to-date.")
             object_files.append(obj_file)
 
     # Compile individual source files
     for src_file in config["src_files"]:
         file_ext = os.path.splitext(src_file)[1]
-        obj_file = os.path.join(obj_dir, os.path.splitext(os.path.basename(src_file))[0] + ".o")
+        base_name = os.path.splitext(os.path.basename(src_file))[0]
+        obj_file = os.path.join(obj_dir, base_name + ".o")
+        dep_file = obj_file + '.d'
 
-        # Determine if it's a C or C++ file and use appropriate compiler
         if file_ext == ".c":
-            compile_cmd = (
-                f"{config['compiler']['c_compiler']} "
-                f"{config['cflags']['common']} "
-                f"{config['cflags']['c']} "
-                f"-c {src_file} -o {obj_file}"
-            )
+            cflags = f"{config['cflags']['common']} {config['cflags']['c']}"
+            compiler = config['compiler']['c_compiler']
         elif file_ext == ".cpp":
-            compile_cmd = (
-                f"{config['compiler']['cpp_compiler']} "
-                f"{config['cflags']['common']} "
-                f"{config['cflags']['cpp']} "
-                f"-c {src_file} -o {obj_file}"
-            )
+            cflags = f"{config['cflags']['common']} {config['cflags']['cpp']}"
+            compiler = config['compiler']['cpp_compiler']
         else:
             print(f"Unknown file extension for {src_file}")
             return False
 
-        if not cmd(compile_cmd, shell=True):
-            print(f"Failed to compile {src_file}")
-            return False
+        if needs_recompilation(obj_file, dep_file):
+            if not compile_source(src_file, compiler, cflags, obj_file):
+                return False
+        else:
+            print(f"Skipping compilation of {src_file}; up-to-date.")
         object_files.append(obj_file)
 
     # Link all object files into a final executable
     output_executable = os.path.join(bin_dir, config["output"]["binary_name"])
-    link_cmd = (
-        f"{config['compiler']['cpp_compiler']} "
-        f"{' '.join(object_files)} "
-        f"{config['ldflags']} "
-        f"-o {output_executable}"
-    )
+    # Check if the executable needs to be relinked
+    recompile_executable = False
+    if not os.path.exists(output_executable):
+        recompile_executable = True
+    else:
+        exe_mtime = os.path.getmtime(output_executable)
+        for obj_file in object_files:
+            if os.path.getmtime(obj_file) > exe_mtime:
+                recompile_executable = True
+                break
 
-    if not cmd(link_cmd, shell=True):
-        print(f"Failed to link object files.")
-        return False
+    if recompile_executable:
+        link_cmd = (
+            f"{config['compiler']['cpp_compiler']} "
+            f"{' '.join(object_files)} "
+            f"{config['ldflags']} "
+            f"-o {output_executable}"
+        )
 
-    print(f"Compilation successful. Executable created at {output_executable}")
+        if not cmd(link_cmd, shell=True):
+            print(f"Failed to link object files.")
+            return False
+        print(f"Linked object files into executable {output_executable}")
+    else:
+        print(f"Skipping linking; executable {output_executable} is up-to-date.")
+
+    print(f"Compilation successful. Executable is at {output_executable}")
     return True
 
 class program:
@@ -257,32 +315,53 @@ class program:
                 print(Fore.RED + "could not install make")
                 sys.exit()
     def gpp():
-        if not bash(f"g++ --version"):
-            if not cmd(f"{gpp} --version", shell=True):
-                program.choco()
-                cmd(f"{choco} install mingw  --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+        if platform.system() == "Windows":
+            if not bash(f"g++ --version"):
                 if not cmd(f"{gpp} --version", shell=True):
-                    print(Fore.RED + "could not install gpp")
-                    sys.exit()
-                env = os.environ.copy()
-                env["PATH"] = f"{gpp}\\..;{env['PATH']}"
-                cmd("refreshenv", shell=True)
-                if not bash(f"g++ --version"):
+                    program.choco()
+                    cmd(f"{choco} install mingw  --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+                    if not cmd(f"{gpp} --version", shell=True):
+                        print(Fore.RED + "could not install gpp")
+                        sys.exit()
+                    env = os.environ.copy()
+                    env["PATH"] = f"{gpp}\\..;{env['PATH']}"
+                    cmd("refreshenv", shell=True)
+                    if not bash(f"g++ --version"):
+                        print(Fore.RED + "could not install g++")
+                        sys.exit()
+        if platform.system() == "Linux":
+            if not cmd("g++ --version", shell=True):
+                cmd("sudo apt-get update", shell=True)
+                cmd("sudo apt-get install g++", shell=True)
+                if not cmd("g++ --version", shell=True):
                     print(Fore.RED + "could not install g++")
                     sys.exit()
+        if platform.system() == "Darwin":
+            pass
+
     def gcc():
-        if not bash(f"gcc --version"):
-            if not cmd(f"{gcc} --version", shell=True):
-                program.choco()
-                cmd(f"{choco} install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+        if not cmd("gcc --version"):
+            if not bash(f"gcc --version"):
                 if not cmd(f"{gcc} --version", shell=True):
+                    program.choco()
+                    cmd(f"{choco} install mingw --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
+                    if not cmd(f"{gcc} --version", shell=True):
+                        print(Fore.RED + "could not install gcc")
+                        sys.exit()
+                env = os.environ.copy()
+                env["PATH"] = f"{gcc}\\..;{env['PATH']}"
+                if not bash(f"gcc --version"):
                     print(Fore.RED + "could not install gcc")
                     sys.exit()
-            env = os.environ.copy()
-            env["PATH"] = f"{gcc}\\..;{env['PATH']}"
-            if not bash(f"gcc --version"):
-                print(Fore.RED + "could not install gcc")
-                sys.exit()
+        if platform.system() == "Linux":
+            if not cmd("gcc --version", shell=True):
+                cmd("sudo apt-get update", shell=True)
+                cmd("sudo apt-get install gcc", shell=True)
+                if not cmd("gcc --version", shell=True):
+                    print(Fore.RED + "could not install gcc")
+                    sys.exit()
+        if platform.system() == "Darwin":
+            pass
     def curl():
         if not cmd(f"{curl} --version", shell=True):
             program.choco()
@@ -475,8 +554,9 @@ class library:
             config["ldflags"] += f" -L{cwd_win}\\external\\glfw\\glfw-3.3.10.bin.WIN64\\lib-mingw-w64 -L{cwd_win}\\external\\glew\\glew-2.1.0\\lib\\Release\\x64 " 
             config["ldflags"] += " -lglew32 -lglfw3 -lopengl32 -lgdi32 " 
         if platform.system() == "Linux":
-            cmd("sudo apt-get update", shell=True)
-            cmd("sudo apt-get install libglfw3-dev libglew-dev", shell=True)
+            if not cmd("dpkg -s libglfw3-dev", shell=True) or not cmd("dpkg -s libglew-dev", shell=True):
+                cmd("sudo apt-get update", shell=True)
+                cmd("sudo apt-get install libglfw3-dev libglew-dev", shell=True)
             config["ldflags"] += " -lglfw -lGLEW -lGL "
         if platform.system() == "Darwin":
             sys.exit()
