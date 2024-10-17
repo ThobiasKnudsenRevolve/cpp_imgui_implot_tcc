@@ -251,6 +251,45 @@ public:
         printf("did not find channel ptr\n");
     }
 
+    void GGplot(std::string log_id) {
+        Channel* channel_ax = GetChannelPtr(log_id, {"vcu/102.INS.ax"});
+        Channel* channel_ay = GetChannelPtr(log_id, {"vcu/102.INS.ay"});
+        if (!channel_ax || !channel_ay) {
+            printf("ERROR: could not find channel ptr\n");
+            return;
+        }
+
+        std::vector<float> plot_ax;
+        std::vector<double> plot_ax_time;
+        std::vector<float> plot_ay;
+        std::vector<double> plot_ay_time;
+        channel_ax->GetDataForPlot(plot_ax_time, plot_ax);
+        channel_ay->GetDataForPlot(plot_ay_time, plot_ay);
+
+        if (plot_ax_time.size() != plot_ay_time.size()) {
+            printf("ERROR: ax and ay data sizes do not match\n");
+        }
+
+        auto [min_ax_iter, max_ax_iter] = std::minmax_element(plot_ax.begin(), plot_ax.end());
+        auto [min_ay_iter, max_ay_iter] = std::minmax_element(plot_ay.begin(), plot_ay.end());
+        float min_time = *min_ax_iter;
+        float max_time = *max_ax_iter;
+        float min_value = *min_ay_iter;
+        float max_value = *max_ay_iter;
+        float ax_range = max_time - min_time;
+        float ay_range = max_value - min_value;
+        float ax_padding = (ax_range == 0) ? 1.0f : ax_range * 0.05f;
+        float ay_padding = (ay_range == 0) ? 1.0f : ay_range * 0.05f;
+        ImVec2 plot_size = ImGui::GetContentRegionAvail();
+        if (ImPlot::BeginPlot("Data from Mocking Server", plot_size)) {
+            ImPlot::SetupAxes("ax (m/s^2)", "ay (m/s^2)");
+            ImPlot::SetupAxisLimits(ImAxis_X1, min_time - ax_padding, max_time + ax_padding, ImPlotCond_Always);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - ay_padding, max_value + ay_padding, ImPlotCond_Always);
+            ImPlot::PlotScatter("gg plot", plot_ax.data(), plot_ay.data(), static_cast<int>(plot_ax.size()));
+            ImPlot::EndPlot();
+        }
+    }
+
     void PlotHistogram() {
         std::vector<float> data = {};
         for (float y = 0.f; y < 100.f; y+=1.f) {
@@ -271,6 +310,7 @@ public:
         if (ImGui::BeginTabBar("MainTabBar")) {
             if (ImGui::BeginTabItem("Plots")) {
                 if (ImGui::TreeNodeEx("Plot")) {Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("GGplot")) {GGplot("live"); ImGui::TreePop();}
                 if (ImGui::TreeNodeEx("Histogram")) {PlotHistogram();ImGui::TreePop();}
                 ImGui::EndTabItem();
             }

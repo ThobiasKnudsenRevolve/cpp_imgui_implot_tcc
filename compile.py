@@ -101,8 +101,8 @@ if platform.system() == "Windows":
     print("hello")
     config = {
         "compiler": {
-            "c_compiler": "gcc",    # C compiler
-            "cpp_compiler": "g++"   # C++ compiler
+            "c_compiler": f"{gcc}",      # C compiler
+            "cpp_compiler": f"{gpp}"  # C++ compiler
         },
         "cflags": {
             "common": "-Wall",        # Common flags for both C and C++ files
@@ -316,19 +316,15 @@ class program:
                 sys.exit()
     def gpp():
         if platform.system() == "Windows":
-            if not bash(f"g++ --version"):
+            if not cmd(f"{gpp} --version", shell=True):
+                program.choco()
+                cmd(f"{choco} install mingw  --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
                 if not cmd(f"{gpp} --version", shell=True):
-                    program.choco()
-                    cmd(f"{choco} install mingw  --installargs 'ADD_MINGW_TO_PATH=System' -y", shell=True)
-                    if not cmd(f"{gpp} --version", shell=True):
-                        print(Fore.RED + "could not install gpp")
-                        sys.exit()
-                    env = os.environ.copy()
-                    env["PATH"] = f"{gpp}\\..;{env['PATH']}"
-                    cmd("refreshenv", shell=True)
-                    if not bash(f"g++ --version"):
-                        print(Fore.RED + "could not install g++")
-                        sys.exit()
+                    print(Fore.RED + "could not install gpp")
+                    sys.exit()
+                env = os.environ.copy()
+                env["PATH"] = f"{gpp}\\..;{env['PATH']}"
+                cmd("refreshenv", shell=True)
         if platform.system() == "Linux":
             if not cmd("g++ --version", shell=True):
                 cmd("sudo apt-get update", shell=True)
@@ -389,7 +385,7 @@ class program:
             pass
     def git():
         if platform.system() == "Windows":
-            if not bash(f"git --version"):
+            if not cmd(f"{git} --version", shell=True):
                 if not cmd(f"{git} --version", shell=True):
                     program.choco()
                     cmd(f"{choco} install git --force --installargs 'ADD_GIT_TO_PATH=System' -y", shell=True)
@@ -398,15 +394,15 @@ class program:
                         sys.exit()
                 env = os.environ.copy()
                 env["PATH"] = f"{git}\\..;{env['PATH']}"
-                if not bash(f"git --version"):
+                if not cmd(f"{git} --version", shell=True):
                     print(Fore.RED + "could not install git")
                     sys.exit()
         if platform.system() == "Linux":
-            if not cmd("git --version", shell=True):
+            if not cmd(f"git --version", shell=True):
                 cmd("sudo apt-get update", shell=True)
                 cmd("sudo apt-get install git", shell=True)
                 cmd("source ~/.bashrc")
-                if not cmd("git --version"):
+                if not cmd(f"git --version"):
                     print("could not install git")
                     sys.exit()
         if platform.system() == "Darwin":
@@ -458,29 +454,37 @@ class program:
             if cl_exe_path() == None:
                 print(Fore.RED + "could not find cl full path")
                 sys.exit()
-            if not cmd("cl", shell=True):
+            if not cmd("cl", shell=True) and False:
                 print(Fore.RED + "could not install msvc")
                 sys.exit()
     def vcpkg():
-        if not cmd(f"{vcpkg} --version", shell=True):
-            program.git()
-            program.msvc()
-            if os.path.exists(f"{cwd_win}\\external\\vcpkg"):
-                bash(f"rm -rf {cwd_win}\\external\\vcpkg")
-            
-            cmd(f"powershell -Command \"Remove-Item -Recurse -Force {cwd_win}\\external\\vcpkg\"", shell=True)
-            cmd(f"mkdir {cwd_win}\\external\\vcpkg", shell=True)
-            cmd(f"git clone https://github.com/microsoft/vcpkg.git {cwd_win}\\external\\vcpkg", shell=True)
-            cmd(f".\\bootstrap-vcpkg.bat", cwd=f"{cwd_win}\\external\\vcpkg", shell=True)
+        if platform.system() == "Windows":
             if not cmd(f"{vcpkg} --version", shell=True):
-                print(Fore.RED + "could not install vcpkg")
-                sys.exit()
-        else:
-            program.git()
-            if not cmd(f"{git} pull", cwd=f"{cwd_win}\\external\\vcpkg", shell=True):
-                sys.exit()
-            if not cmd(".\\vcpkg update", cwd=f"{cwd_win}\\external\\vcpkg", shell=True):
-                sys.exit()
+                program.git()
+                program.msvc()
+                if os.path.exists(f"{cwd_win}\\external\\vcpkg"):
+                    bash(f"rm -rf {cwd_win}\\external\\vcpkg")
+                
+                cmd(f"powershell -Command \"Remove-Item -Recurse -Force {cwd_win}\\external\\vcpkg\"", shell=True)
+                cmd(f"mkdir {cwd_win}\\external\\vcpkg", shell=True)
+                cmd(f"{git} clone https://github.com/microsoft/vcpkg.git {cwd_win}\\external\\vcpkg", shell=True)
+                cmd(f".\\bootstrap-vcpkg.bat", cwd=f"{cwd_win}\\external\\vcpkg", shell=True)
+                if not cmd(f"{vcpkg} --version", shell=True):
+                    print(Fore.RED + "could not install vcpkg")
+                    sys.exit()
+            else:
+                program.git()
+                if not cmd(f"{git} pull", cwd=f"{cwd_win}\\external\\vcpkg", shell=True):
+                    sys.exit()
+                if not cmd(".\\vcpkg update", cwd=f"{cwd_win}\\external\\vcpkg", shell=True):
+                    sys.exit()
+        if platform.system() == "Linux":
+            print("vcpkg should not be installed on linux")
+            sys.exit()
+        if platform.system() == "Darwin":
+            print("vcpkg should not be installed on MacOS")
+            sys.exit()
+
 
 class library:
     def tcc():
@@ -497,7 +501,7 @@ class library:
                 
                 cmd(f"powershell -Command \"Remove-Item -Recurse -Force {cwd_win}\\external\\installs\\tcc\n", capture_output=True, shell=True)
                 os.makedirs(f"{cwd_win}\\external\\installs\\tcc")
-                cmd(f"git clone https://github.com/Tiny-C-Compiler/mirror-repository {cwd_win}\\external\\installs\\tcc", capture_output=True, text=True)
+                cmd(f"{git} clone https://github.com/Tiny-C-Compiler/mirror-repository {cwd_win}\\external\\installs\\tcc", capture_output=True, text=True)
                 os.makedirs(f"{cwd_win}\\external\\installs\\tcc\\build")
 
                 configure_prefix = (os.path.abspath(os.path.join("external", "installs", "tcc", "build"))).replace("\\", "/")
@@ -564,7 +568,10 @@ class library:
         if platform.system() == "Windows":
             program.git()
             if not os.path.exists(f"{cwd_win}\\external\\imgui"):
-                cmd(f"git clone https://github.com/adobe/imgui.git {cwd_win}\\external\\imgui",  shell=True)
+                cmd(f"{git} clone https://github.com/adobe/imgui.git {cwd_win}\\external\\imgui",  shell=True)
+                if not os.path.exists(f"{cwd_win}\\external\\imgui"):
+                    print(Fore.RED + "Could not install imgui")
+                    sys.exit()
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\imgui -I{cwd_win}\\external\\imgui\\backends "
             config["src_dirs"].append(f"{cwd_win}\\external\\imgui")
             config["src_files"].append(f"{cwd_win}\\external\\imgui\\backends\\imgui_impl_glfw.cpp")
@@ -572,7 +579,10 @@ class library:
         if platform.system() == "Linux":
             program.git()
             if not os.path.exists(f"{cwd_unix}/external/imgui"):
-                cmd(f"git clone https://github.com/adobe/imgui.git {cwd_unix}/external/imgui",  shell=True)
+                cmd(f"{git} clone https://github.com/adobe/imgui.git {cwd_unix}/external/imgui",  shell=True)
+                if not os.path.exists(f"{cwd_unix}/external/imgui"):
+                    print(Fore.RED + "Could not install imgui")
+                    sys.exit()
             config["cflags"]["common"] += f" -I{cwd_unix}/external/imgui -I{cwd_unix}/external/imgui/backends "
             config["src_dirs"].append(f"{cwd_unix}/external/imgui")
             config["src_files"].append(f"{cwd_unix}/external/imgui/backends/imgui_impl_glfw.cpp")
@@ -583,13 +593,19 @@ class library:
         if platform.system() == "Windows":
             program.git()
             if not os.path.exists(f"{cwd_win}\\external\\implot"):
-                cmd(f"git clone https://github.com/epezent/implot.git {cwd_win}\\external\\implot", shell=True)
+                cmd(f"{git} clone https://github.com/epezent/implot.git {cwd_win}\\external\\implot", shell=True)
+                if not os.path.exists(f"{cwd_win}\\external\\implot"):
+                    print(Fore.RED + "Could not install implot")
+                    sys.exit()
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\implot -I{cwd_win}\\external\\implot\\backends "
             config["src_dirs"].append(f"{cwd_win}\\external\\implot")
         if platform.system() == "Linux":
             program.git()
             if not os.path.exists(f"{cwd_unix}/external/implot"):
                 cmd(f"git clone https://github.com/epezent/implot.git {cwd_unix}/external/implot", shell=True)
+                if not os.path.exists(f"{cwd_unix}/external/implot"):
+                    print(Fore.RED + "Could not install implot")
+                    sys.exit()
             config["cflags"]["common"] += f" -I{cwd_unix}/external/implot -I{cwd_unix}/external/implot/backends "
             config["src_dirs"].append(f"{cwd_unix}/external/implot")
         if platform.system() == "Darwin":
@@ -606,7 +622,7 @@ class library:
 
                 cmd(f"powershell -Command \"Remove-Item -Recurse -Force {cwd_win}\\external\\installs\\curl\n", shell=True)
                 os.makedirs(f"{cwd_win}\\external\\installs\\curl")
-                cmd(f"git clone https://github.com/curl/curl.git {cwd_win}\\external\\installs\\curl", capture_output=True, text=True)
+                cmd(f"{git} clone https://github.com/curl/curl.git {cwd_win}\\external\\installs\\curl", capture_output=True, text=True)
                 os.makedirs(f"{cwd_win}\\external\\installs\\curl\\build")
 
                 bash(f"cd {cwd_bash}/external/installs/curl/build && cmake .. -G 'MinGW Makefiles' -DCMAKE_USE_OPENSSL=ON -DOPENSSL_ROOT_DIR='C:/Program Files/OpenSSL-Win64' -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCURL_STATICLIB=ON -DBUILD_CURL_EXE=OFF -DCMAKE_C_FLAGS='-w'")
@@ -675,7 +691,7 @@ class library:
         if platform.system() == "Windows":
             if not os.path.exists(f"{cwd_win}\\external\\json"):
                 program.git()
-                cmd(f"git clone https://github.com/nlohmann/json.git {cwd_win}\\external\\json", capture_output=True, text=True)
+                cmd(f"{git} clone https://github.com/nlohmann/json.git {cwd_win}\\external\\json", capture_output=True, text=True)
                 if not os.path.exists(f"{cwd_win}\\external\\json"):
                     print(Fore.RED + "Could not install json")
                     sys.exit()
@@ -701,7 +717,7 @@ if __name__ == "__main__":
     library.json()
     library.websocket()
 
-    cmd("g++ --version", shell=True)
+    cmd(f"{gpp} --version", shell=True)
 
     compile(config)
 
