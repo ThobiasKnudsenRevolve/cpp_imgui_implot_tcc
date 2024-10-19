@@ -717,8 +717,6 @@ if __name__ == "__main__":
     library.json()
     library.websocket()
 
-    cmd(f"{gpp} --version", shell=True)
-
     compile(config)
 
 

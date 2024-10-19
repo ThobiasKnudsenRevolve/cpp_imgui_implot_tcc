@@ -170,7 +170,7 @@ public:
             ImPlot::SetupAxes("Time (seconds)", "Value");
             ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
             ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
-            ImPlot::PlotLine("test", plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            ImPlot::PlotLine(tags[0].c_str(), plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
             ImPlot::EndPlot();
         }
     }
@@ -309,7 +309,14 @@ public:
         ImGui::Begin("Plot Window");
         if (ImGui::BeginTabBar("MainTabBar")) {
             if (ImGui::BeginTabItem("Plots")) {
-                if (ImGui::TreeNodeEx("Plot")) {Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) {Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("INS.roll_rate_dt")) {Plot("live", {"vcu/102.INS.roll_rate_dt"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("INS.roll_rate")) {Plot("live", {"vcu/102.INS.roll_rate"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("GNSS.altitude")) {Plot("live", {"vcu/101.GNSS.altitude"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("InsStatus.ins_status")) {Plot("live", {"vcu/117.InsStatus.ins_status"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("ImuMeasurements.ax")) {Plot("live", {"vcu/116.ImuMeasurements.ax"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("ImuMeasurements.ay")) {Plot("live", {"vcu/116.ImuMeasurements.ay"});ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("ImuMeasurements.az")) {Plot("live", {"vcu/116.ImuMeasurements.az"});ImGui::TreePop();}
                 if (ImGui::TreeNodeEx("GGplot")) {GGplot("live"); ImGui::TreePop();}
                 if (ImGui::TreeNodeEx("Histogram")) {PlotHistogram();ImGui::TreePop();}
                 ImGui::EndTabItem();
