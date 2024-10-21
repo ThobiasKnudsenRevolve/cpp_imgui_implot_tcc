@@ -58,6 +58,7 @@ public:
             value.emplace_back(p.second);
         }
         is_prepared = false;
+        updated = true;
     }
     void PrepareData() {
         std::lock_guard<std::mutex> lock(data_mutex);
@@ -168,8 +169,15 @@ public:
         float value_padding = (value_range == 0) ? 1.0f : value_range * 0.05f;
         if (ImPlot::BeginPlot("Data from Mocking Server")) {
             ImPlot::SetupAxes("Time (seconds)", "Value");
-            ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
-            ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
+            if (updated) {
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
+                updated=false;
+            }
+            else {
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding);
+            }
             ImPlot::PlotLine(tags[0].c_str(), plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
             ImPlot::EndPlot();
         }
@@ -306,24 +314,39 @@ public:
     }
 
     void PlotTable() {
-        ImGui::Begin("Plot Window");
+        ImGuiIO& io = ImGui::GetIO();
+        ImGuiStyle& style = ImGui::GetStyle();
+        ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 window_pos = viewport->WorkPos;
+        ImVec2 window_size = ImVec2(viewport->WorkSize.x * 0.5f, viewport->WorkSize.y);
+        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
+        ImGui::SetNextWindowSize(window_size, ImGuiCond_Always);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::Begin("Plot Window", nullptr,
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoTitleBar
+        );
         if (ImGui::BeginTabBar("MainTabBar")) {
             if (ImGui::BeginTabItem("Plots")) {
-                if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) {Plot("live", {"vcu/115.InsEstimates2.yaw_rate"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("INS.roll_rate_dt")) {Plot("live", {"vcu/102.INS.roll_rate_dt"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("INS.roll_rate")) {Plot("live", {"vcu/102.INS.roll_rate"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("GNSS.altitude")) {Plot("live", {"vcu/101.GNSS.altitude"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("InsStatus.ins_status")) {Plot("live", {"vcu/117.InsStatus.ins_status"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("ImuMeasurements.ax")) {Plot("live", {"vcu/116.ImuMeasurements.ax"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("ImuMeasurements.ay")) {Plot("live", {"vcu/116.ImuMeasurements.ay"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("ImuMeasurements.az")) {Plot("live", {"vcu/116.ImuMeasurements.az"});ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("GGplot")) {GGplot("live"); ImGui::TreePop();}
-                if (ImGui::TreeNodeEx("Histogram")) {PlotHistogram();ImGui::TreePop();}
+                if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) { Plot("live", { "vcu/115.InsEstimates2.yaw_rate" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("INS.roll_rate_dt")) { Plot("live", { "vcu/102.INS.roll_rate_dt" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("INS.roll_rate")) { Plot("live", { "vcu/102.INS.roll_rate" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("GNSS.altitude")) { Plot("live", { "vcu/101.GNSS.altitude" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("InsStatus.ins_status")) { Plot("live", { "vcu/117.InsStatus.ins_status" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("ImuMeasurements.ax")) { Plot("live", { "vcu/116.ImuMeasurements.ax" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("ImuMeasurements.ay")) { Plot("live", { "vcu/116.ImuMeasurements.ay" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("ImuMeasurements.az")) { Plot("live", { "vcu/116.ImuMeasurements.az" }); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("GGplot")) { GGplot("live"); ImGui::TreePop(); }
+                if (ImGui::TreeNodeEx("Histogram")) { PlotHistogram(); ImGui::TreePop(); }
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
         }
         ImGui::End();
+        ImGui::PopStyleVar();
     }
+
 
 };
