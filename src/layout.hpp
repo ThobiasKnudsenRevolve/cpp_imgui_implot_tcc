@@ -49,6 +49,12 @@ int heightOfNavbar = 50;
 int widthOfSidebar = 50;
 int heightOfFooter = 200;
 
+float PlotTable_x1 = 0.0f;
+float PlotTable_y1() {return float(heightOfNavbar); }
+float PlotTable_x2 = 200.f;
+float PlotTable_y2() {return ImGui::GetMainViewport()->Size.y - float(heightOfFooter); }
+
+
 bool toggleChannelSelector = false;
 DataManager data_manager;
 std::thread ws_thread(test_mocking_server, std::ref(data_manager));
@@ -185,6 +191,9 @@ void ShowMainWindow() {
     ImGui::SetNextWindowPos(window_position);
     ImGui::SetNextWindowSize(window_size);
 
+    ImVec4 mainWindowBg = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); 
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg);
+
     // Begin the window
     if (ImGui::Begin("MainWindow", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus))
     {
@@ -193,38 +202,27 @@ void ShowMainWindow() {
         ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg); // Apply background color
 
         if (toggleChannelSelector) {
-            data_manager.PlotTable(window_position, window_size);
+            data_manager.PlotTable(PlotTable_x1, PlotTable_y1(), PlotTable_x2, PlotTable_y2());
         }
 
         ImGui::PopStyleColor(); // Restore the previous style color
         ImGui::End();
     }
+
+    ImGui::PopStyleColor();
 }
 
 void ShowFooter() {
-
-
-    // Begin the ImGui window with desired flags
-    ImGui::Begin("Footer", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar);
-
-    // Fix the window position: Ensure it's placed above the bottom by subtracting heightOfFooter
-    ImGui::SetWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - heightOfFooter)); 
-
-    // Set the window size to fit horizontally minus the sidebar width, and vertically using heightOfFooter
-    ImGui::SetWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x - widthOfSidebar, heightOfFooter));
-    
-    // Set the background color using RGBA directly, converting RGB 200, 0, 0 to ImGui's color format
-    ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); // Red color
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg); // Apply background color
-
-    // Render footer text
-    ImGui::Text("Welcome to the Footer Window!");
-
-    // Pop the pushed style color
-    ImGui::PopStyleColor(1);
-    
-    // End the ImGui window
-    ImGui::End();
+    ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); 
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg);
+    if (ImGui::Begin("Footer", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) 
+    {
+        ImGui::SetWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - heightOfFooter)); 
+        ImGui::SetWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x - widthOfSidebar, heightOfFooter));
+        ImGui::Text("Welcome to the Footer Window!");
+        ImGui::End();
+    }
+    ImGui::PopStyleColor();
 }
 
 

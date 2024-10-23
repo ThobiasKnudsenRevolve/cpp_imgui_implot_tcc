@@ -215,7 +215,6 @@ public:
         }
         return nullptr;
     }
-
     bool AddDatapoint(std::string log_id, std::vector<std::string> tags, double time, float value) {
 
         //printf("%s %f %f\n", tags[0].c_str(), time, value);
@@ -236,19 +235,16 @@ public:
         //printf("SUCCESS: added one data point");
         return true;
     }
-
     Channel* CreateNewChannel(std::string log_id, std::vector<std::string> tags) {
         std::sort(tags.begin(), tags.end());
         channels.emplace_back(std::make_unique<Channel>(log_id, tags));
         return channels.back().get();
     }
-
     void PrintData() {
         for (const auto& channel_ptr : channels) {
             channel_ptr->PrintData();
         }
     }
-
     void Plot(std::string log_id, std::vector<std::string> tags) {
         std::sort(tags.begin(), tags.end());
         Channel* channel_ptr = GetChannelPtr1(log_id, tags);
@@ -258,7 +254,6 @@ public:
         }
         printf("did not find channel ptr\n");
     }
-
     void GGplot(std::string log_id) {
         Channel* channel_ax = GetChannelPtr(log_id, {"vcu/102.INS.ax"});
         Channel* channel_ay = GetChannelPtr(log_id, {"vcu/102.INS.ay"});
@@ -297,7 +292,6 @@ public:
             ImPlot::EndPlot();
         }
     }
-
     void PlotHistogram() {
         std::vector<float> data = {};
         for (float y = 0.f; y < 100.f; y+=1.f) {
@@ -312,42 +306,75 @@ public:
             ImPlot::EndPlot();
         }
     }
+    void PlotTable(float static_x1, float static_y1, float& dynamic_x2, float static_y2) {
+        if (ImGui::Begin("Plot Window", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar)) {
 
-    void PlotTable(ImVec2 parent_pos, ImVec2 parent_size) {
-        // ImGuiIO& io = ImGui::GetIO();
-        // ImGuiStyle& style = ImGui::GetStyle();
-        // ImGuiViewport* viewport = ImGui::GetMainViewport();
-        // ImVec2 window_pos = viewport->WorkPos;
-        // ImVec2 window_size = ImVec2(viewport->WorkSize.x * 0.5f, viewport->WorkSize.y);
-        ImVec2 window_size = ImVec2(500,800);
-        ImVec2 window_pos = ImVec2(parent_pos.x, parent_pos.y);
+            ImVec2          pos = ImVec2(static_x1, static_y1);
+            ImVec2          size = ImVec2(dynamic_x2-static_x1, static_y2-static_y1);
 
+            ImGui::SetWindowPos(pos);
+            ImGui::SetWindowSize(size);
 
-        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
-        ImGui::SetNextWindowSize(window_size, ImGuiCond_Always);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-        ImGui::Begin("Plot Window", nullptr,
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoTitleBar
-        );
-        if (ImGui::BeginTabBar("MainTabBar")) {
-            if (ImGui::BeginTabItem("Plots")) {
-                if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) { Plot("live", { "vcu/115.InsEstimates2.yaw_rate" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("INS.roll_rate_dt")) { Plot("live", { "vcu/102.INS.roll_rate_dt" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("INS.roll_rate")) { Plot("live", { "vcu/102.INS.roll_rate" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("GNSS.altitude")) { Plot("live", { "vcu/101.GNSS.altitude" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("InsStatus.ins_status")) { Plot("live", { "vcu/117.InsStatus.ins_status" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("ImuMeasurements.ax")) { Plot("live", { "vcu/116.ImuMeasurements.ax" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("ImuMeasurements.ay")) { Plot("live", { "vcu/116.ImuMeasurements.ay" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("ImuMeasurements.az")) { Plot("live", { "vcu/116.ImuMeasurements.az" }); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("GGplot")) { GGplot("live"); ImGui::TreePop(); }
-                if (ImGui::TreeNodeEx("Histogram")) { PlotHistogram(); ImGui::TreePop(); }
-                ImGui::EndTabItem();
+            static bool     is_resizing = false;
+            static float    initial_mouse_x = 0.0f;
+            static float    initial_width = 300.0f;
+            //ImVec2          window_pos = ImGui::GetWindowPos();
+            //ImVec2          window_size = ImGui::GetWindowSize();
+            
+            float           handle_width = 10.0f;
+            ImVec2          handle_min = ImVec2(size.x - handle_width, 0);
+            ImVec2          handle_max = ImVec2(size.x, size.y);
+            ImDrawList*     draw_list = ImGui::GetWindowDrawList();
+            ImVec2          abs_min = pos;
+            ImVec2          abs_max = ImVec2(pos.x + size.x, pos.y + size.y);
+            draw_list->AddRectFilled(
+                ImVec2(abs_min.x + handle_min.x, abs_min.y + handle_min.y),
+                ImVec2(abs_min.x + handle_max.x, abs_min.y + handle_max.y),
+                IM_COL32(100, 100, 100, 255));
+            ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+            bool is_hovered = ImGui::IsWindowHovered() &&
+                              mouse_pos.x >= (pos.x + handle_min.x) &&
+                              mouse_pos.x <= (pos.x + handle_max.x) &&
+                              mouse_pos.y >= pos.y &&
+                              mouse_pos.y <= (pos.y + size.y);
+            if (is_hovered)
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            if (is_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)){
+                is_resizing = true;
+                initial_mouse_x = mouse_pos.x;
+                initial_width = size.x;
             }
-            ImGui::EndTabBar();
+            if (is_resizing) {
+                if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                    float delta = ImGui::GetIO().MousePos.x - initial_mouse_x;
+                    float new_width = initial_width + delta;
+                    new_width = std::max(new_width, 100.0f); // Ensure a minimum width
+                    size.x = new_width; // Update the persistent window size
+                    ImGui::SetWindowSize(ImVec2(new_width, size.y));
+                    dynamic_x2 = new_width + static_x1;
+                }
+                if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    is_resizing = false;
+                }
+            }
+            if (ImGui::BeginTabBar("MainTabBar")) {
+                if (ImGui::BeginTabItem("Plots")) {
+                    if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) { Plot("live", { "vcu/115.InsEstimates2.yaw_rate" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("INS.roll_rate_dt")) { Plot("live", { "vcu/102.INS.roll_rate_dt" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("INS.roll_rate")) { Plot("live", { "vcu/102.INS.roll_rate" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("GNSS.altitude")) { Plot("live", { "vcu/101.GNSS.altitude" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("InsStatus.ins_status")) { Plot("live", { "vcu/117.InsStatus.ins_status" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("ImuMeasurements.ax")) { Plot("live", { "vcu/116.ImuMeasurements.ax" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("ImuMeasurements.ay")) { Plot("live", { "vcu/116.ImuMeasurements.ay" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("ImuMeasurements.az")) { Plot("live", { "vcu/116.ImuMeasurements.az" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("GGplot")) { GGplot("live"); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("Histogram")) { PlotHistogram(); ImGui::TreePop(); }
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+            ImGui::End();
         }
-        ImGui::End();
-        ImGui::PopStyleVar();
     }
 
 
