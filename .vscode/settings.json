@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "algorithm": "cpp",
-        "chrono": "cpp",
-        "mutex": "cpp",
-        "memory": "cpp"
-    },
-    "C_Cpp.errorSquiggles": "disabled"
-}
