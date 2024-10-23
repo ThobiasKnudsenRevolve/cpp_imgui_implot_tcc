@@ -313,19 +313,21 @@ public:
         }
     }
 
-    void PlotTable() {
-        ImGuiIO& io = ImGui::GetIO();
-        ImGuiStyle& style = ImGui::GetStyle();
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 window_pos = viewport->WorkPos;
-        ImVec2 window_size = ImVec2(viewport->WorkSize.x * 0.5f, viewport->WorkSize.y);
+    void PlotTable(ImVec2 parent_pos, ImVec2 parent_size) {
+        // ImGuiIO& io = ImGui::GetIO();
+        // ImGuiStyle& style = ImGui::GetStyle();
+        // ImGuiViewport* viewport = ImGui::GetMainViewport();
+        // ImVec2 window_pos = viewport->WorkPos;
+        // ImVec2 window_size = ImVec2(viewport->WorkSize.x * 0.5f, viewport->WorkSize.y);
+        ImVec2 window_size = ImVec2(500,800);
+        ImVec2 window_pos = ImVec2(parent_pos.x, parent_pos.y);
+
+
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
         ImGui::SetNextWindowSize(window_size, ImGuiCond_Always);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
         ImGui::Begin("Plot Window", nullptr,
             ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoTitleBar
         );
         if (ImGui::BeginTabBar("MainTabBar")) {

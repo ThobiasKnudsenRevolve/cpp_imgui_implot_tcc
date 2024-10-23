@@ -673,7 +673,7 @@ class library:
 
             config["cflags"]["common"] += f" -I{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\include "
             config["ldflags"] += f"-L{cwd_win}\\external\\vcpkg\\installed\\x64-windows-static\\lib \
-                -lboost_system-vc143-mt-x64-1_85 -lboost_context-vc143-mt-x64-1_85 -lboost_coroutine-vc143-mt-x64-1_85 -lboost_thread-vc143-mt-x64-1_85 -lws2_32" 
+                -lboost_system-vc143-mt-x64-1_86 -lboost_context-vc143-mt-x64-1_86 -lboost_coroutine-vc143-mt-x64-1_86 -lboost_thread-vc143-mt-x64-1_86 -lws2_32" 
 
         if platform.system() == "Linux":
             if not cmd("dpkg -l | grep libboost-all-dev", shell=True) \
