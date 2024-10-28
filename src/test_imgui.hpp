@@ -142,6 +142,7 @@ int test_imgui()
         //ImPlot::ShowDemoWindow();
 
         data_manager_1.PlotTable();
+        
 
         
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
@@ -178,6 +179,11 @@ int test_imgui()
             ImGui::Text("Hello from another window!");
             if (ImGui::Button("Close Me"))
                 show_another_window = false;
+            ImGui::End();
+        }
+
+        if (ImGui::Begin("plot8")) {
+            data_manager_1.Plot8();   
             ImGui::End();
         }
         

@@ -16,6 +16,7 @@
 #include "test_mocking_server.hpp"
 #include <stdio.h>
 #include <thread>
+#include <chrono>
 #define GL_SILENCE_DEPRECATION
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <GLES2/gl2.h>
@@ -198,7 +199,7 @@ void ShowMainWindow() {
     if (ImGui::Begin("MainWindow", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus))
     {
         // Set the background color using RGBA directly, converting RGB 200, 0, 0 to ImGui's color format
-        ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); // Red color
+        ImVec4 mainWindowBg = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); // Red color
         ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg); // Apply background color
 
         if (toggleChannelSelector) {
@@ -332,6 +333,11 @@ int layout()
         ShowSidebar();
         ShowMainWindow();
         ShowFooter();
+
+        if (ImGui::Begin("plot8")) {
+            data_manager.Plot8();   
+            ImGui::End();
+        }
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)

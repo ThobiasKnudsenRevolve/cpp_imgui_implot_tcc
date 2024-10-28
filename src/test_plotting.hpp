@@ -182,7 +182,21 @@ public:
             ImPlot::EndPlot();
         }
     }
-
+    void Plot2() {
+        std::vector<double> plot_time;
+        std::vector<float> plot_value;
+        GetDataForPlot(plot_time, plot_value);
+        if (plot_time.empty() || plot_value.empty()) {
+            return;
+        }
+        double first_time = plot_time.front();
+        std::vector<float> plot_time_float(plot_time.size());
+        for (size_t i = 0; i < plot_time.size(); ++i) {
+            plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
+        }
+        
+        ImPlot::PlotLine(tags[0].c_str(), plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+    }
 };
 
 class DataManager {
@@ -254,6 +268,15 @@ public:
         }
         printf("did not find channel ptr\n");
     }
+    void Plot2(std::string log_id, std::vector<std::string> tags) {
+        std::sort(tags.begin(), tags.end());
+        Channel* channel_ptr = GetChannelPtr1(log_id, tags);
+        if (channel_ptr) {
+            channel_ptr->Plot2();
+            return;
+        }
+        printf("did not find channel ptr\n");
+    }
     void GGplot(std::string log_id) {
         Channel* channel_ax = GetChannelPtr(log_id, {"vcu/102.INS.ax"});
         Channel* channel_ay = GetChannelPtr(log_id, {"vcu/102.INS.ay"});
@@ -303,6 +326,67 @@ public:
         }
         if (ImPlot::BeginPlot("Normal Distribution Histogram", "Value", "Frequency")) {
             ImPlot::PlotHistogram("Histogram", data.data(), static_cast<int>(data.size()), 200, 1.0, ImPlotRange{0.f, 100.f}, 0);
+            ImPlot::EndPlot();
+        }
+    }
+    void Plot8() {
+
+        if (ImPlot::BeginPlot("stress test", ImVec2(-1,-1))) {
+            Channel* channel_ptr = GetChannelPtr1("live", { "vcu/102.INS.ax" });
+            std::vector<double> plot_time;
+            std::vector<float> plot_value;
+            if (!channel_ptr) {
+                ImPlot::EndPlot();
+                return;
+            }
+            channel_ptr->GetDataForPlot(plot_time, plot_value);
+            if (plot_time.empty() || plot_value.empty()) {
+                ImPlot::EndPlot();
+                return;
+            }
+            double first_time = plot_time.front();
+            std::vector<float> plot_time_float(plot_time.size());
+            for (size_t i = 0; i < plot_time.size(); ++i) {
+                plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
+            }
+            auto [min_time_iter, max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
+            auto [min_value_iter, max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
+            float min_time = (*max_time_iter - *min_time_iter)>5.0f ? *max_time_iter - 5.0f : *min_time_iter;
+            float max_time = *max_time_iter;
+            float min_value = *min_value_iter;
+            float max_value = *max_value_iter;
+            float time_range = max_time - min_time;
+            float value_range = max_value - min_value;
+            float time_padding = (time_range == 0) ? 1.0f : time_range * 0.05f;
+            float value_padding = (value_range == 0) ? 1.0f : value_range * 0.05f;
+            
+            ImPlot::SetupAxes("Time (seconds)", "Value");
+            if (channel_ptr->updated) {
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
+                channel_ptr->updated=false;
+            }
+            else {
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding);
+            }
+
+            Plot2("live", { "vcu/102.INS.ax" });
+            Plot2("live", { "vcu/102.INS.ay" });
+            Plot2("live", { "vcu/119.InverterEstimates.motor_torque.fl" });
+            Plot2("live", { "vcu/119.InverterEstimates.motor_torque.fr" });
+            Plot2("live", { "vcu/119.InverterEstimates.motor_torque.rl" });
+            Plot2("live", { "vcu/119.InverterEstimates.motor_torque.rr" });
+
+
+            Plot2("live", { "vcu/115.InsEstimates2.yaw_rate" });
+            Plot2("live", { "vcu/102.INS.roll_rate_dt" });
+            Plot2("live", { "vcu/101.GNSS.altitude" });
+            Plot2("live", { "vcu/117.InsStatus.ins_status" });
+            Plot2("live", { "vcu/116.ImuMeasurements.ax" });
+            Plot2("live", { "vcu/116.ImuMeasurements.ay" });
+            Plot2("live", { "vcu/116.ImuMeasurements.az" });
+
             ImPlot::EndPlot();
         }
     }
@@ -357,8 +441,10 @@ public:
                     is_resizing = false;
                 }
             }
+
             if (ImGui::BeginTabBar("MainTabBar")) {
                 if (ImGui::BeginTabItem("Plots")) {
+                    if (ImGui::TreeNodeEx("stress test")) { Plot8(); ImGui::TreePop(); }
                     if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) { Plot("live", { "vcu/115.InsEstimates2.yaw_rate" }); ImGui::TreePop(); }
                     if (ImGui::TreeNodeEx("INS.roll_rate_dt")) { Plot("live", { "vcu/102.INS.roll_rate_dt" }); ImGui::TreePop(); }
                     if (ImGui::TreeNodeEx("INS.roll_rate")) { Plot("live", { "vcu/102.INS.roll_rate" }); ImGui::TreePop(); }
