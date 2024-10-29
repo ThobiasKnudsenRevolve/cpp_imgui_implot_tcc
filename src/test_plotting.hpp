@@ -24,6 +24,13 @@ public:
     std::vector<float> value = {};
     bool is_prepared = false;
     bool updated = true;
+
+    bool follow_data = true;
+
+    float min_time_view = -1.f;
+    float max_time_view = 1.f;
+    float min_value_view = -1.f;
+    float max_value_view = 1.f;
     
     std::mutex data_mutex;
 
@@ -146,10 +153,14 @@ public:
         out_value = value;
     }
     void Plot() {
+        // ----------------------------
+        // 1. Data Preparation
+        // ----------------------------
         std::vector<double> plot_time;
         std::vector<float> plot_value;
         GetDataForPlot(plot_time, plot_value);
         if (plot_time.empty() || plot_value.empty()) {
+            // No data to plot
             return;
         }
         double first_time = plot_time.front();
@@ -157,28 +168,68 @@ public:
         for (size_t i = 0; i < plot_time.size(); ++i) {
             plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
         }
-        auto [min_time_iter, max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
-        auto [min_value_iter, max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
-        float min_time = (*max_time_iter - *min_time_iter)>5.0f ? *max_time_iter - 5.0f : *min_time_iter;
-        float max_time = *max_time_iter;
-        float min_value = *min_value_iter;
-        float max_value = *max_value_iter;
-        float time_range = max_time - min_time;
-        float value_range = max_value - min_value;
-        float time_padding = (time_range == 0) ? 1.0f : time_range * 0.05f;
-        float value_padding = (value_range == 0) ? 1.0f : value_range * 0.05f;
+        // Layout: Place the toggle button above the plot
+        ImGui::Checkbox("Follow Data", &follow_data);
+        // Optionally, display the current state
+        if (follow_data) {
+            ImGui::Text("Mode: Following Data");
+        } else {
+            ImGui::Text("Mode: Stand Still");
+        }
+        if (follow_data) {
+                // Compute data min and max
+            auto [data_min_time_iter, data_max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
+            auto [data_min_value_iter, data_max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
+            float data_min_time = *data_min_time_iter;
+            float data_max_time = *data_max_time_iter;
+            float data_min_value = *data_min_value_iter;
+            float data_max_value = *data_max_value_iter;
+            float data_time_range = max_time_view - min_time_view;
+            float data_value_range = data_max_value - data_min_value;
+            // Calculate new axis limits based on data while preserving the desired range
+            float new_max_time = data_max_time;
+            float new_min_time = data_max_time - data_time_range;
+            float new_max_value = data_max_value;
+            float new_min_value = new_max_value - data_value_range;
+            // Validate axis limits
+            if (!std::isfinite(new_min_time) || !std::isfinite(new_max_time) ||
+                !std::isfinite(new_min_value) || !std::isfinite(new_max_value)) {
+                std::cerr << "Axis limits contain non-finite values." << std::endl;
+                return;
+            }
+            if (new_min_time >= new_max_time || new_min_value >= new_max_value) {
+                std::cerr << "Axis minimums must be less than maximums." << std::endl;
+                return;
+            }
+            // Update stored view limits
+            min_time_view = new_min_time;
+            max_time_view = new_max_time;
+            min_value_view = new_min_value;
+            max_value_view = new_max_value;
+        }
         if (ImPlot::BeginPlot("Data from Mocking Server")) {
             ImPlot::SetupAxes("Time (seconds)", "Value");
-            if (updated) {
-                ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding, ImPlotCond_Always);
-                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding, ImPlotCond_Always);
-                updated=false;
+            if (follow_data) {
+                // Apply padding directly in the plotting setup
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time_view - 0.05f * (max_time_view - min_time_view), max_time_view + 0.05f * (max_time_view - min_time_view), ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value_view - 0.05f * (max_value_view - min_value_view), max_value_view + 0.05f * (max_value_view - min_value_view), ImPlotCond_Always);
             }
             else {
-                ImPlot::SetupAxisLimits(ImAxis_X1, min_time - time_padding, max_time + time_padding);
-                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - value_padding, max_value + value_padding);
+                // When not following, set axis limits without forcing them
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time_view - 0.05f * (max_time_view - min_time_view),max_time_view + 0.05f * (max_time_view - min_time_view));
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value_view - 0.05f * (max_value_view - min_value_view), max_value_view + 0.05f * (max_value_view - min_value_view));
+                ImPlotRect limits = ImPlot::GetPlotLimits();
+                // Update stored view limits based on user interactions (zoom/pan)
+                min_time_view = limits.X.Min;
+                max_time_view = limits.X.Max;
+                min_value_view = limits.Y.Min;
+                max_value_view = limits.Y.Max;
             }
-            ImPlot::PlotLine(tags[0].c_str(), plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            if (!tags.empty()) {
+                ImPlot::PlotLine(tags[0].c_str(), plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            } else {
+                ImPlot::PlotLine("Data", plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            }
             ImPlot::EndPlot();
         }
     }
