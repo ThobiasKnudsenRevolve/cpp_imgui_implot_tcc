@@ -48,6 +48,7 @@ ImVec4 ColorFromRGB(int r, int g, int b, float a) {
 int heightOfNavbar = 50;
 int widthOfSidebar = 50;
 int heightOfFooter = 200;
+int heightOfBottomStatusBar = 5;
 
 float PlotTable_x1 = 0.0f;
 float PlotTable_y1() {return float(heightOfNavbar); }
@@ -139,7 +140,7 @@ void ShowSidebar()
 
     // Position the sidebar on the right side and set the height accordingly
     ImGui::SetWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - widthOfSidebar, heightOfNavbar)); // 
-    ImGui::SetWindowSize(ImVec2(widthOfSidebar, ImGui::GetIO().DisplaySize.y)); // 
+    ImGui::SetWindowSize(ImVec2(widthOfSidebar, ImGui::GetIO().DisplaySize.y - heightOfBottomStatusBar)); // 
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, sidebarBg); // Set the background color
     ImGui::PopStyleColor(1);
@@ -191,14 +192,21 @@ void ShowMainWindow() {
     ImGui::SetNextWindowPos(window_position);
     ImGui::SetNextWindowSize(window_size);
 
-    ImVec4 mainWindowBg = ImVec4(0.0f, 0.0f, 0.0f, 1.0f); 
+    ImVec4 mainWindowBg = ColorFromRGB(23, 23, 23, 1.0); 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg);
 
     // Begin the window
-    if (ImGui::Begin("MainWindow", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus))
+    if (ImGui::Begin("MainWindow", nullptr, 
+    ImGuiWindowFlags_NoTitleBar | 
+    ImGuiWindowFlags_NoMove | 
+    ImGuiWindowFlags_NoNav | 
+    ImGuiWindowFlags_NoResize | 
+    ImGuiWindowFlags_NoScrollbar | 
+    ImGuiWindowFlags_NoBringToFrontOnFocus))
+
     {
         // Set the background color using RGBA directly, converting RGB 200, 0, 0 to ImGui's color format
-        ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); // Red color
+        ImVec4 mainWindowBg = ColorFromRGB(23, 23, 23, .6); 
         ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg); // Apply background color
 
         if (toggleChannelSelector) {
@@ -209,23 +217,45 @@ void ShowMainWindow() {
         ImGui::End();
     }
 
+    if (ImGui::Begin("ggplot", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) 
+    { 
+        ImGui::SetWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, heightOfBottomStatusBar));
+        ImGui::Text("Welcome to the GGPLOT!");
+    
+        // data_manager.PlotHistogram();
+        ImGui::End();
+    }
+
     ImGui::PopStyleColor();
 }
 
 void ShowFooter() {
-    ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); 
-    ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg);
+    // ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); 
+    // ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg);
     if (ImGui::Begin("Footer", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) 
     {
-        ImGui::SetWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - heightOfFooter)); 
+        ImGui::SetWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - heightOfFooter - heightOfBottomStatusBar)); 
         ImGui::SetWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x - widthOfSidebar, heightOfFooter));
         ImGui::Text("Welcome to the Footer Window!");
         ImGui::End();
     }
-    ImGui::PopStyleColor();
+    // ImGui::PopStyleColor();
 }
 
 
+
+void ShowBottomStatusBar() {
+    // ImVec4 mainWindowBg = ImVec4(200.0f / 255.0f, 0.0f, 0.0f, 1.0f); 
+    // ImGui::PushStyleColor(ImGuiCol_WindowBg, mainWindowBg);
+    if (ImGui::Begin("Footer", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) 
+    {
+        ImGui::SetWindowPos(ImVec2(0, ImGui::GetIO().DisplaySize.y - heightOfBottomStatusBar)); 
+        ImGui::SetWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, heightOfBottomStatusBar));
+        ImGui::Text("Welcome to the StatusBar!");
+        ImGui::End();
+    }
+    // ImGui::PopStyleColor();
+}
 
 // Main code
 int layout()
@@ -332,6 +362,9 @@ int layout()
         ShowSidebar();
         ShowMainWindow();
         ShowFooter();
+        ShowBottomStatusBar();
+
+        ImPlot::ShowDemoWindow();
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
@@ -359,6 +392,7 @@ int layout()
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
+
         
 
         // Rendering

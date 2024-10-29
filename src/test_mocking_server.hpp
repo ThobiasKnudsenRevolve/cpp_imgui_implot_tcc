@@ -33,17 +33,20 @@ void test_mocking_server(DataManager& data_manager) {
                     printf("Invalid or missing 'timestamp' field.");
                     return;
                 }
+                //printf("%s\n", data_message.dump(4).c_str());
                 double time = data_message["timestamp"].get<double>();
                 if (data_message.contains("data") && data_message["data"].is_object()) {
 
                     json data_object = data_message["data"];
+                    //printf("%s\n", data_object.dump(4).c_str());
 
                     for (auto& [tag, value] : data_object.items()) {
                         if (!value.is_number())
                             continue;
                         {
+                            //printf("tag: %s time: %f value: %f\n", tag.c_str(), time, value.get<float>());
                             std::lock_guard<std::mutex> lock(channel_mutex);
-                            data_manager.AddDatapoint("live", {tag}, time, value);
+                            data_manager.AddDatapoint("live", {tag}, time, value.get<float>());
                         }
                     }
                 }

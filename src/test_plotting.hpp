@@ -10,38 +10,55 @@
 #include <mutex>
 #include <chrono>
 
+#include "imgui.h"
 #include "implot.h"
+#include "implot_internal.h"
 
 using namespace std;
 
 class Channel {
-    
 public:
-    
     std::string log_id;
     std::vector<std::string> tags = {};
     std::vector<double> time = {};  // Use double for time
     std::vector<float> value = {};
     bool is_prepared = false;
     bool updated = true;
-    
+
+    bool follow_data = true;
+
+    // Stored view limits
+    float max_value_view = 1.f;
+    float min_value_view = -1.f;
+    double max_time_view = 1.f;
+    double min_time_view = -1.f;
+
+    // Desired ranges to preserve when toggling follow_data
+    float start_time_range = 5.0f;   // Example initial range
+    float start_value_range = 2.0f;  // Example initial range
+
     std::mutex data_mutex;
 
-    string name;
-    
+    std::string name;
+
 public:
-    
-    Channel(const string& log_id, const std::vector<std::string>& tags) : log_id(log_id), tags(tags) {}
+    Channel(const std::string& log_id, const std::vector<std::string>& tags)
+        : log_id(log_id), tags(tags) {}
+
+    // Delete copy and move constructors/assignments
     Channel(const Channel&) = delete;
     Channel& operator=(const Channel&) = delete;
     Channel(Channel&&) = delete;
     Channel& operator=(Channel&&) = delete;
+
     std::string GetLogId() {
         return log_id;
     }
+
     std::vector<std::string> GetTags() {
         return tags;
     }
+
     void AddDatapoint(const std::pair<double, float>& new_point) {
         std::lock_guard<std::mutex> lock(data_mutex);
         if (!time.empty() && new_point.first <= time.back())
@@ -50,7 +67,9 @@ public:
         value.emplace_back(new_point.second);
         updated = true;
     }
-    void AddDatapoints(const vector<pair<float, float>>& newPoints) {
+
+    void AddDatapoints(const std::vector<std::pair<float, float>>& newPoints) {
+        std::lock_guard<std::mutex> lock(data_mutex);
         time.reserve(time.size() + newPoints.size());
         value.reserve(value.size() + newPoints.size());
         for (const auto& p : newPoints) {
@@ -60,18 +79,19 @@ public:
         is_prepared = false;
         updated = true;
     }
+
     void PrepareData() {
         std::lock_guard<std::mutex> lock(data_mutex);
         if (!is_prepared) {
-            vector<size_t> indices(time.size());
+            std::vector<size_t> indices(time.size());
             for (size_t i = 0; i < indices.size(); ++i)
                 indices[i] = i;
             // Sort indices based on the time values
-            sort(indices.begin(), indices.end(), [this](size_t a, size_t b) {
+            std::sort(indices.begin(), indices.end(), [this](size_t a, size_t b) {
                 return time[a] < time[b];
             });
-            vector<double> sorted_time;
-            vector<float> sorted_value;
+            std::vector<double> sorted_time;
+            std::vector<float> sorted_value;
             sorted_time.reserve(time.size());
             sorted_value.reserve(value.size());
             for (size_t idx : indices) {
@@ -79,7 +99,6 @@ public:
                 sorted_value.emplace_back(value[idx]);
             }
             // Remove duplicates by keeping the last occurrence
-            // Since sorted, duplicates are adjacent
             size_t unique_count = 0;
             for (size_t i = 1; i < sorted_time.size(); ++i) {
                 if (sorted_time[i] != sorted_time[unique_count]) {
@@ -94,19 +113,20 @@ public:
             sorted_time.resize(unique_count + 1);
             sorted_value.resize(unique_count + 1);
             // Assign back to the member vectors
-            time = move(sorted_time);
-            value = move(sorted_value);
+            time = std::move(sorted_time);
+            value = std::move(sorted_value);
             is_prepared = true;
         }
     }
+
     float GetValue(float query_time) {
-        if (!is_prepared) 
+        if (!is_prepared)
             PrepareData();
-        if (time.empty()) 
-            throw runtime_error("No data points available for interpolation.");
-        if (query_time <= time.front()) 
+        if (time.empty())
+            throw std::runtime_error("No data points available for interpolation.");
+        if (query_time <= time.front())
             return value.front();
-        if (query_time >= time.back()) 
+        if (query_time >= time.back())
             return value.back();
         // Binary search to find the upper bound
         size_t left = 0;
@@ -120,32 +140,35 @@ public:
         }
 
         if (left == time.size())
-            throw runtime_error("Interpolation failed: upper bound not found.");
+            throw std::runtime_error("Interpolation failed: upper bound not found.");
         if (time[left] == query_time)
             return value[left];
-        
+
         size_t lower_idx = left - 1;
         size_t upper_idx = left;
-        
-        float t1 = time[lower_idx];
+
+        float t1 = static_cast<float>(time[lower_idx]);
         float v1 = value[lower_idx];
-        float t2 = time[upper_idx];
+        float t2 = static_cast<float>(time[upper_idx]);
         float v2 = value[upper_idx];
-        
+
         // Linear interpolation
         return v1 + (v2 - v1) * (query_time - t1) / (t2 - t1);
     }
+
     void PrintData() const {
         for (size_t i = 0; i < time.size(); ++i) {
-            cout << "Time: " << time[i] << ", Value: " << value[i] << '\n';
+            std::cout << "Time: " << time[i] << ", Value: " << value[i] << '\n';
         }
     }
+
     void GetDataForPlot(std::vector<double>& out_time, std::vector<float>& out_value) {
         std::lock_guard<std::mutex> lock(data_mutex);
         out_time = time;
         out_value = value;
     }
-    void Plot() {
+
+    void Plot2() {
         std::vector<double> plot_time;
         std::vector<float> plot_value;
         GetDataForPlot(plot_time, plot_value);
@@ -183,7 +206,109 @@ public:
         }
     }
 
+    void Plot() {
+        // ----------------------------
+        // 1. Data Preparation
+        // ----------------------------
+        std::vector<double> plot_time;
+        std::vector<float> plot_value;
+        GetDataForPlot(plot_time, plot_value);
+
+        if (plot_time.empty() || plot_value.empty()) {
+            // No data to plot
+            return;
+        }
+
+        double first_time = plot_time.front();
+        std::vector<float> plot_time_float(plot_time.size());
+        for (size_t i = 0; i < plot_time.size(); ++i) {
+            plot_time_float[i] = static_cast<float>((plot_time[i] - first_time) / 1000.0);
+        }
+
+        // Layout: Place the toggle button above the plot
+        ImGui::Checkbox("Follow Data", &follow_data);
+
+        // Optionally, display the current state
+        if (follow_data) {
+            ImGui::Text("Mode: Following Data");
+        } else {
+            ImGui::Text("Mode: Stand Still");
+        }
+
+        if (follow_data) {
+
+                // Compute data min and max
+            auto [data_min_time_iter, data_max_time_iter] = std::minmax_element(plot_time_float.begin(), plot_time_float.end());
+            auto [data_min_value_iter, data_max_value_iter] = std::minmax_element(plot_value.begin(), plot_value.end());
+
+            float data_min_time = *data_min_time_iter;
+            float data_max_time = *data_max_time_iter;
+            float data_min_value = *data_min_value_iter;
+            float data_max_value = *data_max_value_iter;
+
+            float data_time_range = max_time_view - min_time_view;
+            float data_value_range = data_max_value - data_min_value;
+
+            // Calculate new axis limits based on data while preserving the desired range
+            float new_max_time = data_max_time;
+            float new_min_time = data_max_time - data_time_range;
+
+            float new_max_value = data_max_value;
+            float new_min_value = new_max_value - data_value_range;
+
+            // Validate axis limits
+            if (!std::isfinite(new_min_time) || !std::isfinite(new_max_time) ||
+                !std::isfinite(new_min_value) || !std::isfinite(new_max_value)) {
+                std::cerr << "Axis limits contain non-finite values." << std::endl;
+                return;
+            }
+
+            if (new_min_time >= new_max_time || new_min_value >= new_max_value) {
+                std::cerr << "Axis minimums must be less than maximums." << std::endl;
+                return;
+            }
+
+            // Update stored view limits
+            min_time_view = new_min_time;
+            max_time_view = new_max_time;
+            min_value_view = new_min_value;
+            max_value_view = new_max_value;
+        }
+        else {
+
+        }
+
+        if (ImPlot::BeginPlot("Data from Mocking Server")) {
+            ImPlot::SetupAxes("Time (seconds)", "Value");
+
+            if (follow_data) {
+                // Apply padding directly in the plotting setup
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time_view - 0.05f * (max_time_view - min_time_view), max_time_view + 0.05f * (max_time_view - min_time_view), ImPlotCond_Always);
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value_view - 0.05f * (max_value_view - min_value_view), max_value_view + 0.05f * (max_value_view - min_value_view), ImPlotCond_Always);
+            }
+            else {
+                // When not following, set axis limits without forcing them
+                ImPlot::SetupAxisLimits(ImAxis_X1, min_time_view - 0.05f * (max_time_view - min_time_view),max_time_view + 0.05f * (max_time_view - min_time_view));
+                ImPlot::SetupAxisLimits(ImAxis_Y1, min_value_view - 0.05f * (max_value_view - min_value_view), max_value_view + 0.05f * (max_value_view - min_value_view));
+
+                ImPlotRect limits = ImPlot::GetPlotLimits();
+
+                // Update stored view limits based on user interactions (zoom/pan)
+                min_time_view = limits.X.Min;
+                max_time_view = limits.X.Max;
+                min_value_view = limits.Y.Min;
+                max_value_view = limits.Y.Max;
+            }
+            if (!tags.empty()) {
+                ImPlot::PlotLine(tags[0].c_str(), plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            } else {
+                ImPlot::PlotLine("Data", plot_time_float.data(), plot_value.data(), static_cast<int>(plot_time_float.size()));
+            }
+            ImPlot::EndPlot();
+        }
+    }
 };
+
 
 class DataManager {
 
@@ -252,11 +377,60 @@ public:
             channel_ptr->Plot();
             return;
         }
-        printf("did not find channel ptr\n");
+        printf("did not find channel. log_id %s tag %s\n", log_id.c_str(), tags[0].c_str());
     }
+    void StyleSeaborn() {
+
+    ImPlotStyle& style              = ImPlot::GetStyle();
+
+    ImVec4* colors                  = style.Colors;
+    colors[ImPlotCol_Line]          = IMPLOT_AUTO_COL;
+    colors[ImPlotCol_Fill]          = IMPLOT_AUTO_COL;
+    colors[ImPlotCol_MarkerOutline] = IMPLOT_AUTO_COL;
+    colors[ImPlotCol_MarkerFill]    = IMPLOT_AUTO_COL;
+    colors[ImPlotCol_ErrorBar]      = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImPlotCol_FrameBg]       = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImPlotCol_PlotBg]        = ImVec4(0.92f, 0.92f, 0.95f, 1.00f);
+    colors[ImPlotCol_PlotBorder]    = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImPlotCol_LegendBg]      = ImVec4(0.92f, 0.92f, 0.95f, 1.00f);
+    colors[ImPlotCol_LegendBorder]  = ImVec4(0.80f, 0.81f, 0.85f, 1.00f);
+    colors[ImPlotCol_LegendText]    = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImPlotCol_TitleText]     = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImPlotCol_InlayText]     = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImPlotCol_AxisText]      = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImPlotCol_AxisGrid]      = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImPlotCol_AxisBgHovered]   = ImVec4(0.92f, 0.92f, 0.95f, 1.00f);
+    colors[ImPlotCol_AxisBgActive]    = ImVec4(0.92f, 0.92f, 0.95f, 0.75f);
+    colors[ImPlotCol_Selection]     = ImVec4(1.00f, 0.65f, 0.00f, 1.00f);
+    colors[ImPlotCol_Crosshairs]    = ImVec4(0.23f, 0.10f, 0.64f, 0.50f);
+
+    style.LineWeight       = 1.5;
+    style.Marker           = ImPlotMarker_None;
+    style.MarkerSize       = 4;
+    style.MarkerWeight     = 1;
+    style.FillAlpha        = 1.0f;
+    style.ErrorBarSize     = 5;
+    style.ErrorBarWeight   = 1.5f;
+    style.DigitalBitHeight = 8;
+    style.DigitalBitGap    = 4;
+    style.PlotBorderSize   = 0;
+    style.MinorAlpha       = 1.0f;
+    style.MajorTickLen     = ImVec2(0,0);
+    style.MinorTickLen     = ImVec2(0,0);
+    style.MajorTickSize    = ImVec2(0,0);
+    style.MinorTickSize    = ImVec2(0,0);
+    style.MajorGridSize    = ImVec2(1.2f,1.2f);
+    style.MinorGridSize    = ImVec2(1.2f,1.2f);
+    style.PlotPadding      = ImVec2(12,12);
+    style.LabelPadding     = ImVec2(5,5);
+    style.LegendPadding    = ImVec2(5,5);
+    style.MousePosPadding  = ImVec2(5,5);
+    style.PlotMinSize      = ImVec2(300,225);
+}
     void GGplot(std::string log_id) {
-        Channel* channel_ax = GetChannelPtr(log_id, {"vcu/102.INS.ax"});
-        Channel* channel_ay = GetChannelPtr(log_id, {"vcu/102.INS.ay"});
+      
+        Channel* channel_ax = GetChannelPtr(log_id, {"vcu.102.INS.ax"});
+        Channel* channel_ay = GetChannelPtr(log_id, {"vcu.102.INS.ay"});
         if (!channel_ax || !channel_ay) {
             printf("ERROR: could not find channel ptr\n");
             return;
@@ -284,11 +458,16 @@ public:
         float ax_padding = (ax_range == 0) ? 1.0f : ax_range * 0.05f;
         float ay_padding = (ay_range == 0) ? 1.0f : ay_range * 0.05f;
         ImVec2 plot_size = ImGui::GetContentRegionAvail();
+           
+        StyleSeaborn();
         if (ImPlot::BeginPlot("Data from Mocking Server", plot_size)) {
             ImPlot::SetupAxes("ax (m/s^2)", "ay (m/s^2)");
             ImPlot::SetupAxisLimits(ImAxis_X1, min_time - ax_padding, max_time + ax_padding, ImPlotCond_Always);
             ImPlot::SetupAxisLimits(ImAxis_Y1, min_value - ay_padding, max_value + ay_padding, ImPlotCond_Always);
+            ImPlot::PushStyleVar(ImPlotStyleVar_FillAlpha, 0.25f);
+            ImPlot::SetNextMarkerStyle(ImPlotMarker_Square, 6, ImPlot::GetColormapColor(10), IMPLOT_AUTO, ImPlot::GetColormapColor(1));
             ImPlot::PlotScatter("gg plot", plot_ax.data(), plot_ay.data(), static_cast<int>(plot_ax.size()));
+            ImPlot::PopStyleVar();
             ImPlot::EndPlot();
         }
     }
@@ -359,14 +538,14 @@ public:
             }
             if (ImGui::BeginTabBar("MainTabBar")) {
                 if (ImGui::BeginTabItem("Plots")) {
-                    if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) { Plot("live", { "vcu/115.InsEstimates2.yaw_rate" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("INS.roll_rate_dt")) { Plot("live", { "vcu/102.INS.roll_rate_dt" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("INS.roll_rate")) { Plot("live", { "vcu/102.INS.roll_rate" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("GNSS.altitude")) { Plot("live", { "vcu/101.GNSS.altitude" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("InsStatus.ins_status")) { Plot("live", { "vcu/117.InsStatus.ins_status" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("ImuMeasurements.ax")) { Plot("live", { "vcu/116.ImuMeasurements.ax" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("ImuMeasurements.ay")) { Plot("live", { "vcu/116.ImuMeasurements.ay" }); ImGui::TreePop(); }
-                    if (ImGui::TreeNodeEx("ImuMeasurements.az")) { Plot("live", { "vcu/116.ImuMeasurements.az" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("InsEstimates2.yaw_rate")) { Plot("live", { "vcu.115.InsEstimates2.yaw_rate" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("INS.roll_rate_dt")) { Plot("live", { "vcu.102.INS.roll_rate_dt" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("INS.roll_rate")) { Plot("live", { "vcu.102.INS.roll_rate" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("GNSS.altitude")) { Plot("live", { "vcu.101.GNSS.altitude" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("InsStatus.ins_status")) { Plot("live", { "vcu.117.InsStatus.ins_status" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("ImuMeasurements.ax")) { Plot("live", { "vcu.116.ImuMeasurements.ax" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("ImuMeasurements.ay")) { Plot("live", { "vcu.116.ImuMeasurements.ay" }); ImGui::TreePop(); }
+                    if (ImGui::TreeNodeEx("ImuMeasurements.az")) { Plot("live", { "vcu.116.ImuMeasurements.az" }); ImGui::TreePop(); }
                     if (ImGui::TreeNodeEx("GGplot")) { GGplot("live"); ImGui::TreePop(); }
                     if (ImGui::TreeNodeEx("Histogram")) { PlotHistogram(); ImGui::TreePop(); }
                     ImGui::EndTabItem();
